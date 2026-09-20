@@ -1,0 +1,2233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WorkBuddy 管理中心</title>
+<style>
+:root{
+  --bg:#f4f6f9; --side:#1e2430; --side-2:#262e3d; --side-tx:#aeb7c6;
+  --panel:#ffffff; --panel-2:#fafbfc; --line:#e3e6ea; --line-2:#eef0f3;
+  --text:#1f2329; --text-2:#5c6470; --text-3:#8a919e;
+  --accent:#2b6cff; --accent-soft:#eaf1ff;
+  --ok:#1a7f47; --ok-soft:#e6f4ec;
+  --warn:#a86300; --warn-soft:#fdf3e3;
+  --err:#c0392b; --err-soft:#fdecea;
+  --purple:#6a4bd0; --purple-soft:#f0ebfd;
+  --shadow:0 1px 2px rgba(16,24,40,.05),0 1px 3px rgba(16,24,40,.06);
+  --shadow-lg:0 12px 40px rgba(16,24,40,.18);
+  --radius:10px; --side-w:214px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;height:100%}
+body{
+  background:var(--bg);color:var(--text);
+  font:14px/1.6 "PingFang SC","Microsoft YaHei","Segoe UI",system-ui,-apple-system,sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:var(--accent);text-decoration:none}
+.mono{font-family:ui-monospace,"Cascadia Code",Consolas,"Courier New",monospace;font-size:12.5px}
+
+/* ================= 布局 ================= */
+.app{display:flex;min-height:100vh}
+
+/* ---------- 侧边栏 ---------- */
+aside{
+  width:var(--side-w);flex:none;background:var(--side);color:var(--side-tx);
+  display:flex;flex-direction:column;position:sticky;top:0;height:100vh;
+}
+.brand{padding:18px 18px 14px;display:flex;align-items:center;gap:9px}
+.brand .logo{
+  width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,#3d7bff,#7a4bff);
+  display:grid;place-items:center;font-size:14px;flex:none;
+}
+.brand .t{color:#fff;font-weight:650;font-size:14.5px;letter-spacing:-.2px;white-space:nowrap}
+.brand .t small{display:block;font-size:10.5px;color:#7b879b;font-weight:400;letter-spacing:0}
+
+nav{padding:6px 10px;flex:1;overflow-y:auto}
+.nav-t{
+  font-size:10.5px;color:#6b7688;font-weight:600;letter-spacing:.8px;
+  padding:12px 9px 6px;text-transform:uppercase;
+}
+.nav-i{
+  display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:7px;
+  font-size:13.5px;cursor:pointer;color:var(--side-tx);user-select:none;
+  border:0;background:none;width:100%;font-family:inherit;text-align:left;
+  transition:background .12s,color .12s;
+}
+.nav-i:hover{background:var(--side-2);color:#e8ecf3}
+.nav-i.on{background:var(--accent);color:#fff;font-weight:600}
+.nav-i .i{width:16px;text-align:center;flex:none;font-size:14px;opacity:.9}
+.nav-i .n{
+  margin-left:auto;font-size:11px;background:rgba(255,255,255,.1);
+  padding:1px 7px;border-radius:100px;font-weight:600;
+}
+.nav-i.on .n{background:rgba(255,255,255,.24)}
+.side-f{margin-top:auto;padding:10px}
+.side-f .btn{width:100%;background:var(--side-2);border-color:transparent;color:#cbd3df;font-size:12.5px;padding:7px}
+.side-f .btn:hover{background:#303a4c;color:#fff}
+
+/* ---------- 主区 ---------- */
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+header{
+  position:sticky;top:0;z-index:40;background:rgba(255,255,255,.94);
+  backdrop-filter:blur(12px);border-bottom:1px solid var(--line);
+}
+.hwrap{padding:13px 22px}
+.htop{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+h1{font-size:16.5px;margin:0;font-weight:650;letter-spacing:-.2px;white-space:nowrap}
+h1 .sub{font-size:12.5px;font-weight:400;color:var(--text-3);margin-left:9px}
+.spacer{flex:1}
+.bar{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:11px}
+
+/* 统计卡片（可点） */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:10px;margin-bottom:16px}
+.card{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  padding:12px 14px;box-shadow:var(--shadow);cursor:pointer;
+  transition:border-color .12s,transform .12s,box-shadow .12s;
+}
+.card:hover{border-color:var(--accent);transform:translateY(-1px);box-shadow:0 4px 14px rgba(16,24,40,.09)}
+.card.on{border-color:var(--accent);background:var(--accent-soft);box-shadow:0 0 0 3px var(--accent-soft)}
+.card.flat{cursor:default}
+.card.flat:hover{border-color:var(--line);transform:none;box-shadow:var(--shadow)}
+.card .k{font-size:11.5px;color:var(--text-3);margin-bottom:3px;display:flex;align-items:center;gap:5px}
+.card .v{font-size:22px;font-weight:650;color:var(--text);line-height:1.2;letter-spacing:-.5px}
+.card .v small{font-size:12px;font-weight:400;color:var(--text-3);margin-left:3px}
+.card .d{font-size:11px;color:var(--text-3);margin-top:3px}
+.card.on .k,.card.on .d{color:#1c4fa8}
+.card.on .v{color:#1c4fa8}
+.card.c-warn .v{color:var(--warn)}
+.card.c-err .v{color:var(--err)}
+.card.c-ok .v{color:var(--ok)}
+.card.c-purple .v{color:var(--purple)}
+
+/* 工具条 */
+.search{flex:1;min-width:200px;position:relative}
+.search input{
+  width:100%;padding:8px 12px 8px 32px;border:1px solid var(--line);border-radius:8px;
+  font-size:13.5px;background:var(--panel);color:var(--text);outline:none;font-family:inherit;
+}
+.search input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.search::before{
+  content:"";position:absolute;left:11px;top:50%;width:12px;height:12px;margin-top:-7px;
+  border:2px solid var(--text-3);border-radius:50%;
+}
+.search::after{
+  content:"";position:absolute;left:20px;top:50%;width:6px;height:2px;margin-top:3px;
+  background:var(--text-3);transform:rotate(45deg);border-radius:1px;
+}
+select,.btn{
+  padding:8px 11px;border:1px solid var(--line);border-radius:8px;background:var(--panel);
+  font-size:13px;color:var(--text);cursor:pointer;font-family:inherit;outline:none;
+}
+select:focus,.btn:focus{border-color:var(--accent)}
+.btn:hover{background:var(--panel-2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:550}
+.btn.primary:hover{background:#1f5ee6}
+.btn.danger{color:var(--err);border-color:#f0c8c3}
+.btn.danger:hover{background:var(--err-soft)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+main{flex:1;padding:18px 22px 70px;max-width:1560px;width:100%}
+
+/* ================= 任务列表（紧凑列表式） ================= */
+.tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;font-size:12.5px;color:var(--text-3)}
+.rows{display:flex;flex-direction:column;gap:6px}
+.row{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  box-shadow:var(--shadow);overflow:hidden;transition:border-color .12s;
+}
+.row:hover{border-color:#d3d8e0}
+.rhead{display:flex;gap:11px;align-items:flex-start;padding:10px 13px;cursor:pointer}
+.rhead:hover{background:var(--panel-2)}
+.caret{
+  flex:none;width:14px;color:var(--text-3);font-size:10px;padding-top:4px;
+  transition:transform .15s;user-select:none;text-align:center;
+}
+.row.open .caret{transform:rotate(90deg)}
+.rmain{flex:1;min-width:0}
+.rl1{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.rname{font-weight:600;font-size:13.5px;color:var(--text);word-break:break-word;cursor:pointer}
+.rname:hover{color:var(--accent)}
+.rmeta{display:flex;gap:13px;flex-wrap:wrap;margin-top:3px;font-size:12px;color:var(--text-3)}
+.rmeta .mono{color:var(--text-2)}
+.rright{display:flex;gap:13px;flex:none;font-size:12px;color:var(--text-3);padding-top:4px;white-space:nowrap;align-items:center}
+.rright b{color:var(--text-2);font-weight:600}
+.rprompt{
+  margin-top:6px;font-size:12px;color:var(--text-2);background:var(--panel-2);
+  border-left:2px solid var(--line);padding:4px 9px;border-radius:0 5px 5px 0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+
+/* 徽章 */
+.badges{display:flex;gap:5px;flex-wrap:wrap;flex:none}
+.badge{font-size:11px;padding:2px 7px;border-radius:5px;font-weight:550;white-space:nowrap;border:1px solid transparent}
+.b-run{background:var(--accent-soft);color:#1c4fa8;border-color:#cfe0ff}
+.b-done{background:var(--ok-soft);color:var(--ok);border-color:#c8e6d5}
+.b-warn{background:var(--warn-soft);color:var(--warn);border-color:#f0ddb8}
+.b-err{background:var(--err-soft);color:var(--err);border-color:#f5cdc8}
+.b-mode{background:var(--panel-2);color:var(--text-2);border-color:var(--line)}
+.b-exp{background:var(--purple-soft);color:var(--purple);border-color:#ddd0fa}
+.b-auto{background:var(--warn-soft);color:var(--warn);border-color:#f5e0bb}
+.b-del{background:#f1f2f4;color:var(--text-3);border-color:var(--line)}
+.b-lost{background:var(--err-soft);color:var(--err);border-color:#f5cdc8}
+.b-stale{background:var(--warn-soft);color:var(--warn);border-color:#f5e0bb}
+.b-nul{background:#f1f2f4;color:var(--text-3);border-color:var(--line)}
+.b-off{background:var(--panel-2);color:var(--text-3);border-color:var(--line)}
+
+/* 详情 */
+.rbody{display:none;border-top:1px solid var(--line-2);padding:13px 15px;background:var(--panel-2)}
+.row.open .rbody{display:block}
+.sect{margin-bottom:15px}
+.sect:last-child{margin-bottom:0}
+.sect-t{
+  font-size:11.5px;font-weight:650;color:var(--text-3);letter-spacing:.5px;
+  text-transform:uppercase;margin-bottom:7px;display:flex;align-items:center;gap:8px;
+}
+.sect-t::after{content:"";flex:1;height:1px;background:var(--line)}
+.kv{display:grid;grid-template-columns:74px 1fr;gap:3px 12px;font-size:13px;align-items:baseline}
+.kv dt{color:var(--text-3);font-size:12.5px}
+.kv dd{margin:0;word-break:break-all;color:var(--text-2)}
+.acts{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
+.act{
+  font-size:12px;padding:5px 10px;border-radius:6px;border:1px solid var(--line);
+  background:var(--panel);color:var(--text-2);cursor:pointer;font-family:inherit;
+}
+.act:hover{border-color:var(--accent);color:var(--accent)}
+.act.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.act.pri:hover{background:#1f5ee6;color:#fff}
+.act.danger{color:var(--err);border-color:#f0c8c3}
+.act.danger:hover{background:var(--err-soft);border-color:var(--err)}
+.act.ghost{border-style:dashed}
+
+/* 产物 */
+.arts{display:flex;flex-direction:column;gap:4px}
+.art{display:flex;gap:8px;align-items:center;padding:5px 9px;background:var(--panel);border:1px solid var(--line-2);border-radius:7px;font-size:12.5px}
+.art:hover{border-color:#d3d8e0}
+.ic{flex:none;width:24px;height:19px;border-radius:4px;display:grid;place-items:center;font-size:9.5px;font-weight:700;color:#fff}
+.ic-doc{background:#4a7fd4}.ic-img{background:#c47f1a}.ic-vid{background:#a04ad4}
+.ic-zip{background:#5c6470}.ic-code{background:#1a9e6a}.ic-diff{background:#8a919e}
+.ic-plan{background:#2b6cff}.ic-other{background:#9aa1ad}
+.art-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+.art-n:hover{color:var(--accent)}
+.art-p{flex:none;max-width:42%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-3);font-size:11.5px}
+.art-s{flex:none;color:var(--text-3);font-size:11.5px;min-width:54px;text-align:right}
+.miss{color:var(--err);font-size:11px;flex:none}
+.art-copy{flex:none;font-size:11px;color:var(--text-3);cursor:pointer;padding:1px 5px;border-radius:4px;border:1px solid transparent}
+.art-copy:hover{border-color:var(--line);color:var(--accent)}
+
+/* Todo */
+.todos{display:flex;flex-direction:column;gap:3px}
+.todo{display:flex;gap:8px;align-items:flex-start;font-size:13px;padding:3px 0}
+.todo .mk{flex:none;width:15px;height:15px;border-radius:50%;margin-top:2px;font-size:10px;display:grid;place-items:center;border:1.5px solid var(--line)}
+.todo.done .mk{background:var(--ok);border-color:var(--ok);color:#fff}
+.todo.done .tx{color:var(--text-3);text-decoration:line-through}
+.todo.prog .mk{border-color:var(--accent);background:var(--accent);color:#fff}
+.todo .tx{color:var(--text-2)}
+
+/* 用量 */
+.ug{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:7px}
+.ug-item{background:var(--panel);border:1px solid var(--line-2);border-radius:7px;padding:7px 10px}
+.ug-k{font-size:11.5px;color:var(--text-3);margin-bottom:1px}
+.ug-v{font-size:15.5px;font-weight:650;color:var(--text)}
+.ug-v small{font-size:11.5px;font-weight:400;color:var(--text-3);margin-left:3px}
+.bar-o{height:5px;background:var(--line-2);border-radius:3px;margin-top:5px;overflow:hidden}
+.bar-i{height:100%;background:var(--accent);border-radius:3px}
+.cr{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+.cr-i{background:var(--panel);border:1px solid var(--line-2);border-radius:5px;padding:2px 8px;font-size:11.5px;color:var(--text-2)}
+.cr-i b{color:var(--text);font-weight:600}
+
+/* ================= 项目 / 资料库 / 表格 ================= */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:11px}
+.pcard{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  padding:13px 15px;box-shadow:var(--shadow);transition:border-color .12s;
+}
+.pcard:hover{border-color:#d3d8e0}
+.pcard .pn{font-weight:640;font-size:13.5px;display:flex;align-items:center;gap:7px;margin-bottom:6px}
+.pcard .pp{font-size:11.5px;color:var(--text-3);word-break:break-all;margin-bottom:8px;line-height:1.5}
+.pcard .pst{display:flex;gap:11px;flex-wrap:wrap;font-size:12px;color:var(--text-3);margin-bottom:9px}
+.pcard .pst b{color:var(--text-2);font-weight:600}
+.pcard .acts{margin-top:0}
+
+.tbl{width:100%;border-collapse:collapse;background:var(--panel);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);font-size:13px}
+.tbl th{
+  text-align:left;font-size:11.5px;font-weight:650;color:var(--text-3);letter-spacing:.4px;
+  padding:9px 12px;border-bottom:1px solid var(--line);background:var(--panel-2);white-space:nowrap;
+}
+.tbl td{padding:9px 12px;border-bottom:1px solid var(--line-2);vertical-align:middle}
+.tbl tr:last-child td{border-bottom:0}
+.tbl tr:hover td{background:var(--panel-2)}
+.tbl .nm{font-weight:600;color:var(--text)}
+.tbl .pth{font-size:11.5px;color:var(--text-3);word-break:break-all;max-width:420px}
+/* 时间类单元格不许折行（否则 "2026-09-15 23:50" 会被挤成两行，很难看） */
+.tbl td.nowrap{white-space:nowrap}
+/* 表格里的名称列限宽，避免长任务名把后面的列挤变形 */
+.tbl td.c-name{max-width:300px}
+.tbl td.c-name .nm{word-break:break-word}
+
+/* ================= 任务列表（表格式，默认形态） ================= */
+/* 明哥要求：默认是「带表头的列表」，卡片内容收进详情。 */
+/*
+ * 布局策略（2026-09-20 第二版）：
+ *   1. 默认**整表刚好占满一屏宽**，不出现横向滚动条；
+ *      内容超出靠省略号，不换行 —— 这样一屏能看到最多行。
+ *   2. 列宽用 table-layout:fixed + 百分比分配，让浏览器按比例分，
+ *      不按内容撑 —— 否则长任务名会把整张表顶得很宽。
+ *   3. 窄屏（<1180px）才启用横向滚动兜底，保证列不被压成一字一行。
+ */
+.lt-wrap{overflow-x:auto;border-radius:var(--radius);
+  box-shadow:var(--shadow);border:1px solid var(--line);background:var(--panel)}
+.lt-wrap::-webkit-scrollbar{height:9px}
+.lt-wrap::-webkit-scrollbar-thumb{background:#c8cfda;border-radius:5px}
+.lt-wrap::-webkit-scrollbar-track{background:var(--panel-2)}
+.lt{width:100%;min-width:1080px;table-layout:fixed;
+    border-collapse:separate;border-spacing:0;background:var(--panel);font-size:13px}
+.lt th{
+  text-align:left;font-size:11.5px;font-weight:650;color:var(--text-3);letter-spacing:.4px;
+  padding:9px 11px;border-bottom:1px solid var(--line);background:var(--panel-2);
+  white-space:nowrap;position:sticky;top:0;z-index:2;
+  /* 表头也省略号：窄屏时「标题（手动）」这类长表头不许折行 */
+  overflow:hidden;text-overflow:ellipsis;
+}
+/* 可排序的表头 */
+.lt th.srt{cursor:pointer;user-select:none}
+.lt th.srt:hover{color:var(--accent)}
+.lt th.srt .ar{opacity:.35;margin-left:3px;font-size:9px}
+.lt th.srt.on{color:var(--accent)}
+.lt th.srt.on .ar{opacity:1}
+.lt td{
+  padding:7px 11px;border-bottom:1px solid var(--line-2);vertical-align:top;
+  /* 关键的三个：超出即省略号、绝不换行 */
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.lt tbody tr:last-child td{border-bottom:0}
+.lt tbody tr:hover td{background:var(--panel-2)}
+.lt tbody tr.open td{background:var(--accent-soft)}
+.lt tbody tr.open:hover td{background:var(--accent-soft)}
+.lt td.nowrap{white-space:nowrap}
+/* 展开行里的内容要能换行（它是详情，不是列表） */
+.lt tr.exp-row>td{white-space:normal;overflow:visible;padding:0}
+/* 列宽：百分比分配，加起来 100%。列表默认刚好一屏宽。 */
+.lt th.c-name,.lt td.c-name{width:17%}
+.lt th.c-cwd,.lt td.c-cwd{width:15%}
+.lt th.c-created,.lt td.c-created{width:9%}
+.lt th.c-updated,.lt td.c-updated{width:10%}
+.lt th.c-auto,.lt td.c-auto{width:14%}
+.lt th.c-mode,.lt td.c-mode{width:6%}
+.lt th.c-model,.lt td.c-model{width:9%}
+.lt th.c-path,.lt td.c-path{width:7%}
+.lt th.c-title,.lt td.c-title{width:9%}
+.lt th.c-acts,.lt td.c-acts{width:4%}
+/* 省略号统一工具类（td 上已有 overflow:hidden，这里只管行内的块级容器） */
+.lt .ell{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;max-width:100%}
+/* 表格里的任务名：**默认不是编辑态**，点它=打开任务。
+   改名要走右侧的小铅笔图标（明哥要求：避免误操作）。 */
+.lt .ename{
+  font-weight:600;color:var(--text);cursor:pointer;border-radius:4px;
+  padding:1px 4px;margin-left:-4px;display:block;max-width:100%;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.lt .ename:hover{color:var(--accent)}
+/* 没手动起过名的任务，标题用浅色，一眼能看出「这个还没命名」 */
+.lt .ename.unnamed{color:var(--text-2);font-weight:550}
+/* 小铅笔按钮 —— 起改标题的作用，点它才进编辑态 */
+.lt .pencil{
+  flex:none;border:0;background:none;cursor:pointer;font-size:12px;line-height:1;
+  color:var(--text-3);padding:2px 3px;border-radius:4px;opacity:.5;
+  font-family:inherit;transition:opacity .12s,background .12s,color .12s;
+}
+.lt tbody tr:hover .pencil{opacity:1}
+.lt .pencil:hover{background:var(--accent-soft);color:var(--accent)}
+/* 「标题（手动）」单元格：文字 + 铅笔并排 */
+.lt .tc{display:flex;align-items:center;gap:2px;min-width:0}
+.lt .tc .ename{flex:1;min-width:0}
+/* 行内编辑输入框 */
+.lt input.rin{
+  width:100%;padding:3px 7px;border:1px solid var(--accent);border-radius:5px;
+  font-size:12.5px;font-family:inherit;outline:none;color:var(--text);background:#fff;
+  box-shadow:0 0 0 3px var(--accent-soft);
+}
+.lt .sub2{font-size:11.5px;color:var(--text-3);margin-top:2px;display:block}
+/* 行首的状态徽章：跟在任务名下面，不参与省略号（它是块级换行） */
+.lt .rbadges{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+/* 操作列的图标按钮横排 */
+.lt .ico{display:flex;gap:2px;align-items:center}
+.lt .ico button{
+  border:0;background:none;cursor:pointer;font-size:12.5px;line-height:1;
+  padding:3px 4px;border-radius:4px;color:var(--text-3);font-family:inherit;
+  transition:background .12s,color .12s;
+}
+.lt .ico button:hover{background:var(--accent-soft);color:var(--accent)}
+.lt .ico button.dg:hover{background:var(--err-soft);color:var(--err)}
+
+.lt .exp-row td{padding:0;border-bottom:1px solid var(--line)}
+.lt .exp-in{padding:14px 16px;background:var(--panel-2)}
+/* 展开详情里的操作条 */
+.lt .dr-acts{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
+/* 表格工具栏里的复选框 */
+.chk{display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--text-2);cursor:pointer;user-select:none;white-space:nowrap}
+.chk input{cursor:pointer;margin:0}
+
+/* 面包屑 */
+.crumb{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--text-3);flex-wrap:wrap;margin-bottom:12px}
+.crumb b{color:var(--text);font-weight:600}
+.crumb .sep{color:var(--line)}
+.crumb span.lnk{cursor:pointer;color:var(--accent)}
+.crumb span.lnk:hover{text-decoration:underline}
+
+/* 空态 / 提示 */
+.empty{text-align:center;padding:60px 20px;color:var(--text-3)}
+.empty .big{font-size:36px;margin-bottom:11px;opacity:.32}
+.empty .t{font-size:15px;color:var(--text-2);margin-bottom:5px}
+.note{
+  background:var(--warn-soft);border:1px solid #f5e0bb;border-radius:8px;padding:10px 14px;
+  font-size:12.5px;color:var(--warn);margin-bottom:13px;line-height:1.7;
+}
+.note b{font-weight:650}
+.note.info{background:var(--accent-soft);border-color:#cfe0ff;color:#1c4fa8}
+.toast{
+  position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:#1f2329;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;
+  opacity:0;pointer-events:none;transition:all .2s;z-index:999;box-shadow:0 6px 20px rgba(0,0,0,.2);
+  max-width:80vw;text-align:center;
+}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.ok{background:#12693a}
+.toast.err{background:#a3281c}
+
+/* 弹窗 */
+.mask{position:fixed;inset:0;background:rgba(16,24,40,.34);z-index:1000;display:none;align-items:center;justify-content:center;padding:20px}
+.mask.on{display:flex}
+.dlg{background:var(--panel);border-radius:12px;max-width:560px;width:100%;box-shadow:var(--shadow-lg);overflow:hidden;max-height:88vh;display:flex;flex-direction:column}
+.dlg-h{padding:15px 20px 12px;font-size:15.5px;font-weight:650;border-bottom:1px solid var(--line-2);display:flex;align-items:center;gap:9px}
+.dlg-h .warnic{color:var(--warn);font-size:17px}
+.dlg-b{padding:15px 20px;font-size:13.5px;color:var(--text-2);line-height:1.8;word-break:break-word;overflow-y:auto;flex:1}
+.dlg-b .hl{color:var(--accent);font-weight:650;background:var(--accent-soft);padding:1px 6px;border-radius:4px}
+.dlg-b .danger-hl{color:var(--err);font-weight:650;background:var(--err-soft);padding:1px 6px;border-radius:4px}
+.dlg-b .path{font-family:ui-monospace,Consolas,monospace;font-size:12px;background:var(--panel-2);padding:6px 10px;border-radius:6px;display:block;margin:5px 0;border:1px solid var(--line-2);color:var(--text-2);cursor:pointer;word-break:break-all}
+.dlg-b .path:hover{border-color:var(--accent);color:var(--accent)}
+.dlg-b input[type=text]{
+  width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:8px;font-size:13.5px;
+  font-family:inherit;outline:none;margin-top:7px;color:var(--text);
+}
+.dlg-b input[type=text]:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.dlg-b ul{margin:7px 0;padding-left:19px}
+.dlg-b li{margin-bottom:3px}
+.dlg-b .box{background:var(--panel-2);border:1px solid var(--line-2);border-radius:8px;padding:10px 13px;margin:9px 0}
+.dlg-f{padding:12px 20px 15px;display:flex;justify-content:flex-end;gap:8px;border-top:1px solid var(--line-2)}
+
+@media(max-width:900px){
+  :root{--side-w:62px}
+  .brand .t,.nav-i span.lbl,.nav-i .n,.side-f .btn span{display:none}
+  .brand{justify-content:center;padding:15px 8px}
+  .nav-i{justify-content:center;padding:10px}
+  .art-p{display:none}.rright{display:none}
+  .hwrap,main{padding-left:14px;padding-right:14px}
+  .kv{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside>
+    <div class="brand">
+      <div class="logo">🐉</div>
+      <div class="t">WorkBuddy<small>管理中心</small></div>
+    </div>
+    <nav id="nav">
+      <div class="nav-t">管理</div>
+      <button class="nav-i on" data-view="overview"><span class="i">📊</span><span class="lbl">总览</span></button>
+      <button class="nav-i" data-view="tasks"><span class="i">💬</span><span class="lbl">任务</span><span class="n" id="n-tasks">0</span></button>
+      <button class="nav-i" data-view="projects"><span class="i">📁</span><span class="lbl">项目</span><span class="n" id="n-projects">0</span></button>
+      <button class="nav-i" data-view="automations"><span class="i">⏰</span><span class="lbl">定时任务</span><span class="n" id="n-autos">0</span></button>
+      <div class="nav-t">资源</div>
+      <button class="nav-i" data-view="library"><span class="i">🗄️</span><span class="lbl">资料库</span></button>
+      <button class="nav-i" data-view="trash"><span class="i">🗑️</span><span class="lbl">回收站</span><span class="n" id="n-trash">0</span></button>
+      <div class="nav-t">关于</div>
+      <button class="nav-i" data-view="settings"><span class="i">⚙️</span><span class="lbl">设置与日志</span></button>
+    </nav>
+    <div class="side-f">
+      <button class="btn" id="btn-about"><span>❓ 使用说明</span></button>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header>
+      <div class="hwrap">
+        <div class="htop">
+          <h1 id="page-t">总览<span class="sub" id="page-s"></span></h1>
+          <span id="mode-tag"></span>
+          <div class="spacer"></div>
+          <button class="btn" id="btn-reload">🔄 刷新数据</button>
+        </div>
+        <div class="bar" id="bar"></div>
+      </div>
+    </header>
+    <main id="main"></main>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="mask" id="mask">
+  <div class="dlg">
+    <div class="dlg-h" id="dlg-h"></div>
+    <div class="dlg-b" id="dlg-b"></div>
+    <div class="dlg-f" id="dlg-f"></div>
+  </div>
+</div>
+
+<script>
+const DATA = /*__DATA__*/null;
+const SERVER = (typeof window !== "undefined") && window.__SERVER__ === true;
+
+/* ================= 基础工具 ================= */
+const $ = (s, r) => (r || document).querySelector(s);
+const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
+const esc = s => String(s == null ? "" : s)
+  .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+  .replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+
+function fmtSize(n) {
+  if (n == null) return "";
+  if (n < 1024) return n + " B";
+  if (n < 1048576) return (n / 1024).toFixed(1) + " KB";
+  if (n < 1073741824) return (n / 1048576).toFixed(1) + " MB";
+  return (n / 1073741824).toFixed(2) + " GB";
+}
+function fmtNum(n) {
+  if (n == null) return "0";
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + "M";
+  if (n >= 1000) return (n / 1000).toFixed(1) + "k";
+  return String(n);
+}
+function fmtTime(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d)) return iso;
+  const p = n => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate())
+    + " " + p(d.getHours()) + ":" + p(d.getMinutes());
+}
+function fmtDay(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d)) return iso;
+  const p = n => String(n).padStart(2, "0");
+  return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate());
+}
+function relTime(iso) {
+  if (!iso) return "";
+  const d = new Date(iso); if (isNaN(d)) return "";
+  const s = (Date.now() - d.getTime()) / 1000;
+  if (s < 0) return "刚刚";
+  if (s < 60) return "刚刚";
+  if (s < 3600) return Math.floor(s / 60) + " 分钟前";
+  if (s < 86400) return Math.floor(s / 3600) + " 小时前";
+  if (s < 2592000) return Math.floor(s / 86400) + " 天前";
+  if (s < 31536000) return Math.floor(s / 2592000) + " 个月前";
+  return Math.floor(s / 31536000) + " 年前";
+}
+function daysSince(iso) {
+  if (!iso) return null;
+  const d = new Date(iso); if (isNaN(d)) return null;
+  return (Date.now() - d.getTime()) / 86400000;
+}
+function toast(msg, kind) {
+  const t = $("#toast");
+  t.textContent = msg;
+  t.className = "toast on" + (kind ? " " + kind : "");
+  clearTimeout(t._h);
+  t._h = setTimeout(() => { t.className = "toast"; }, 2200);
+}
+function copy(text, okMsg) {
+  const done = () => toast(okMsg || "已复制", "ok");
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(done).catch(fallback);
+  } else fallback();
+  function fallback() {
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand("copy"); done(); } catch (e) { toast("复制失败", "err"); }
+    document.body.removeChild(ta);
+  }
+}
+
+/* ================= 弹窗系统 ================= */
+let dlgOnClose = null;
+function dialog(title, bodyHtml, buttons, opts) {
+  opts = opts || {};
+  $("#dlg-h").innerHTML = (opts.warn ? '<span class="warnic">⚠️</span>' : "") + esc(title);
+  $("#dlg-b").innerHTML = bodyHtml;
+  const f = $("#dlg-f");
+  f.innerHTML = "";
+  (buttons || [{ label: "知道了", cls: "btn" }]).forEach(b => {
+    const el = document.createElement("button");
+    el.className = b.cls || "btn";
+    el.innerHTML = esc(b.label);
+    el.addEventListener("click", () => {
+      if (b.onClick) { const keep = b.onClick(); if (keep === true) return; }
+      closeDialog();
+    });
+    f.appendChild(el);
+  });
+  $("#mask").classList.add("on");
+  if (opts.onOpen) opts.onOpen();
+}
+function closeDialog() { $("#mask").classList.remove("on"); $("#dlg-b").innerHTML = ""; $("#dlg-f").innerHTML = ""; dlgOnClose = null; }
+$("#mask").addEventListener("click", e => { if (e.target.id === "mask") closeDialog(); });
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") {
+    if ($("#mask").classList.contains("on")) closeDialog();
+    else if (document.activeElement && document.activeElement.tagName === "INPUT" && document.activeElement.id === "q") {
+      // 清空搜索框。这里**不能**调 render()：那会重建工具条，
+      // 也就是把用户正在用的这个输入框换掉。只改 value + 重画列表。
+      document.activeElement.value = "";
+      state.q = "";
+      renderList();
+    }
+  }
+});
+
+/* ================= 文件 / 任务操作 ================= */
+function openPath(p) {
+  if (!p) return;
+  if (SERVER) {
+    fetch("/api/open?path=" + encodeURIComponent(p)).then(r => r.json()).then(j => {
+      if (!j.ok) toast("打开失败：" + (j.error || "未知错误"), "err");
+    }).catch(() => { toast("本地服务未响应，已复制路径", "err"); copy(p); });
+  } else {
+    try { window.open("file:///" + p.replace(/\\/g, "/"), "_blank"); }
+    catch (e) { copy(p, "路径已复制（静态模式无法直接打开）"); }
+  }
+}
+function revealPath(p) {
+  if (!p) return;
+  if (SERVER) {
+    fetch("/api/reveal?path=" + encodeURIComponent(p)).then(r => r.json()).then(j => {
+      if (!j.ok) toast("打开目录失败：" + (j.error || ""), "err");
+    }).catch(() => copy(p));
+  } else copy(p, "已复制路径（静态模式请手动打开）");
+}
+function openTask(id, title) {
+  if (SERVER) {
+    fetch("/api/reopen?id=" + encodeURIComponent(id)).then(r => r.json()).then(j => {
+      if (j && j.ok) toast("已唤起：" + String(title || "").slice(0, 22), "ok");
+      else toast("唤起失败：" + ((j && j.error) || ""), "err");
+    }).catch(() => { location.href = "workbuddy://chat/" + encodeURIComponent(id); });
+  } else {
+    location.href = "workbuddy://chat/" + encodeURIComponent(id);
+    toast("已请求唤起 WorkBuddy");
+  }
+}
+/* 统一的后端调用：静态模式下给出明确指引 */
+function api(path, opts) {
+  if (!SERVER) {
+    dialog("当前是静态页面", [
+      "这个操作需要写入数据，必须通过本地服务进行。",
+      "请关掉这个页面，双击目录里的这个文件：",
+      '<span class="hl">启动管理中心.bat</span>',
+      "它会打开一个带完整管理功能的面板（可改名、删除、刷新）。</p>",
+      "<p style='margin:0;color:var(--text-3);font-size:12.5px'>目录：</p>",
+      '<span class="path" data-copy="' + esc(location.href.replace(/\/[^/]*$/, "")) + '">' +
+        esc(decodeURIComponent(location.href.replace(/\/[^/]*$/, ""))) + "</span>"
+    ].join("\n"), [{ label: "知道了" }]);
+    return Promise.reject(new Error("static"));
+  }
+  return fetch(path, opts).then(r => r.json());
+}
+
+/* ================= 图标 ================= */
+function iconOf(a) {
+  const ct = (a.content_type || "").toLowerCase();
+  const mime = (a.mime || "").toLowerCase();
+  const name = (a.name || "").toLowerCase();
+  if (a.type === "plan") return ["plan", "方"];
+  if (a.type === "change") return ["diff", "改"];
+  if (ct === "image" || mime.startsWith("image/") || /\.(png|jpe?g|gif|webp|bmp|svg)$/.test(name)) return ["img", "图"];
+  if (ct === "video" || mime.startsWith("video/") || /\.(mp4|mov|avi|mkv|webm)$/.test(name)) return ["vid", "视"];
+  if (/\.(zip|7z|rar|tar|gz)$/.test(name)) return ["zip", "包"];
+  if (/\.(js|ts|mjs|py|java|cs|go|rs|sh|bat|ps1|json|ya?ml|toml)$/.test(name)) return ["code", "码"];
+  if (/\.(xlsx?|csv|docx?|pptx?|pdf|md|txt|html?)$/.test(name)) return ["doc", "文"];
+  return ["other", "·"];
+}
+function statusBadge(s) {
+  if (s === "working") return '<span class="badge b-run">进行中</span>';
+  if (s === "error") return '<span class="badge b-err">出错</span>';
+  if (s === "completed") return '<span class="badge b-done">已完成</span>';
+  return s ? '<span class="badge b-mode">' + esc(s) + "</span>" : "";
+}
+function modeBadge(m) {
+  if (!m) return "";
+  const label = { craft: "执行", plan: "规划", ask: "问答" }[m] || m;
+  return '<span class="badge b-mode">' + esc(label) + "</span>";
+}
+
+/* ================= 状态 ================= */
+//
+// 筛选条件**按视图各存一份**，不共用一套。
+//
+// 为什么不能用一套全局的：这些字段（q / status / mode / …）如果全局共享，
+// 在「任务」页搜了「日报」再切到「项目」页，同一个 q 还挂着 —— 项目路径里
+// 当然不含「日报」，于是项目页一条都不显示。用户看到的是「一切换菜单就空白，
+// 好像坏了」，其实是上个页面的搜索条件漏过来了。
+//
+// 按视图分开后：切走再切回来，各自的搜索条件还在（符合预期），
+// 但不会互相污染。改动只发生在 filterFor() 一个地方。
+const FILTER_KEYS = [
+  "q", "status", "mode", "kind", "time", "sort", "quick",
+  "projScope", "autoScope", "cards",
+];
+function blankFilter() {
+  return {
+    q: "", status: "", mode: "", kind: "", time: "", sort: "updated",
+    quick: "",           // 卡片快捷筛选：no-art / stale / lost / recent
+    projScope: "real",   // real | temp | all
+    // 默认看全部：定时任务本来就少，而且很多是一次性、跑完就没有「下次运行」了，
+    // 默认只看「启用中」会让整页空掉，容易让人以为功能坏了。
+    autoScope: "all",    // all | live | done | deleted
+    // 默认列表（带表头）—— 明哥明确要求的默认形态。
+    // 勾上「卡片视图」才切回原来的卡片样式。
+    cards: false,
+  };
+}
+
+const state = {
+  view: "overview",
+  libPath: "",          // 资料库当前目录（跨视图复用，因为资料库里没有别的筛选）
+  filters: {},          // view -> 筛选条件
+};
+
+// 取当前视图的筛选条件（第一次访问时自动建一份默认的）。
+// 用 getter 而不是直接暴露对象，保证任何地方都拿不到「别的视图」的筛选。
+function F() {
+  if (!state.filters[state.view]) state.filters[state.view] = blankFilter();
+  return state.filters[state.view];
+}
+
+// 给 state 挂上 q / status / … 这几个别名，读到的是**当前视图**的那一份。
+// 这样后面所有 `state.q`、`state.sort` 的既有写法都不用改，却自动变成了
+// 「每个视图各一份」—— 改一处胜过改八十处。
+FILTER_KEYS.forEach(k => {
+  Object.defineProperty(state, k, {
+    get() { return F()[k]; },
+    set(v) { F()[k] = v; },
+    enumerable: true,
+  });
+});
+
+const openSet = new Set();
+const VIEW_TITLE = {
+  overview: ["总览", "WorkBuddy 数据全景"],
+  tasks: ["任务", "所有会话任务"],
+  projects: ["项目", "工作目录"],
+  automations: ["定时任务", "周期与提醒"],
+  library: ["资料库", "文件浏览"],
+  trash: ["回收站", "已删除的任务与定时任务"],
+  settings: ["设置与日志", "备份、操作记录"],
+};
+
+/* ================= 筛选 ================= */
+function isStale(t, days) {
+  const d = daysSince(t.updated_at || t.created_at);
+  return d == null ? false : d > days;
+}
+function matchTask(t) {
+  // 回收站模式只看已删，其它视图默认隐藏已删
+  if (state.view === "trash") { if (!t.deleted) return false; }
+  else if (t.deleted) return false;
+
+  if (state.quick === "no-art" && (t.artifacts || []).length) return false;
+  if (state.quick === "stale" && !isStale(t, 30)) return false;
+  if (state.quick === "recent") { const d = daysSince(t.updated_at || t.created_at); if (d == null || d > 7) return false; }
+  if (state.quick === "lost" && !(t.artifacts || []).some(a => a.exists === false)) return false;
+
+  const q = state.q.toLowerCase();
+  if (q) {
+    const hay = [t.title, t.auto_title, t.ai_title, t.cwd, t.prompt, t.expert_id, t.model,
+      (t.artifacts || []).map(a => (a.name || "") + " " + (a.path || "")).join(" "),
+      (t.todos || []).map(x => x.content).join(" ")
+    ].join(" ").toLowerCase();
+    if (!hay.includes(q)) return false;
+  }
+  if (state.status && t.status !== state.status) return false;
+  if (state.mode && t.mode !== state.mode) return false;
+  if (state.kind === "art" && !(t.artifacts || []).length) return false;
+  if (state.kind === "expert" && !t.expert_id) return false;
+  if (state.kind === "auto" && !t.is_automation) return false;
+  if (state.time) {
+    const days = parseInt(state.time, 10);
+    const ref = t.updated_at || t.created_at;
+    if (!ref) return false;
+    if ((Date.now() - new Date(ref).getTime()) / 86400000 > days) return false;
+  }
+  return true;
+}
+function sortTasks(arr) {
+  const s = state.sort;
+  const key = t => {
+    if (s === "created") return t.created_at || "";
+    if (s === "name") return t.title || "";
+    if (s === "arts") return String((t.artifacts || []).length).padStart(6, "0");
+    if (s === "credits") return String(((t.usage || {}).credits_total || 0)).padStart(12, "0");
+    if (s === "oldest") return t.updated_at || "";
+    return t.updated_at || "";
+  };
+  const dir = (s === "name" || s === "oldest") ? 1 : -1;
+  return arr.slice().sort((a, b) => {
+    const ka = key(a), kb = key(b);
+    return ka < kb ? -dir : ka > kb ? dir : 0;
+  });
+}
+
+/* ================= 顶栏 / 工具条 ================= */
+//
+// 这一块要和「打字」严格分开，否则会出现两个连在一起的怪现象：
+//   1. 打一个字，光标就没了（要重新点搜索框才能接着打）
+//   2. 明明只打了一个字母，内容却「自动跑进搜索框」
+//
+// 根因是同一个：输入框是 renderChrome() 用 innerHTML 重建出来的。
+// 敲键盘 → input 事件 → state.q 变了 → render() → renderChrome() →
+// bar.innerHTML = h **把这个 <input> 元素整个销毁再新建一个**。
+// 新元素虽然 value 一样，但：
+//   · 它是个全新的 DOM 节点，浏览器的光标位置跟着旧节点一起没了
+//   · 输入法（中文拼音）的组字上下文一并丢失，正在拼的字被截断
+// 表现就是「打不进去字」「刚打的字自己跳走」。
+//
+// 做法：把工具条拆成两半
+//   · buildBar()  —— 只在**视图切换**时调一次，负责造出 <input>、<select>
+//   · syncBar()   —— 每次渲染只同步 value/选中项，**绝不重建 DOM**
+// 于是打字时 DOM 稳如泰山，光标和输入法都不受影响。
+function renderHeader() {
+  const meta = VIEW_TITLE[state.view] || ["", ""];
+  $("#page-t").innerHTML = esc(meta[0]) + '<span class="sub">' + esc(meta[1]) + "</span>";
+  $("#mode-tag").innerHTML = SERVER
+    ? '<span class="badge b-done" style="font-size:11.5px">● 实时模式</span>'
+    : '<span class="badge b-auto" style="font-size:11.5px">● 静态快照</span>';
+}
+
+function renderSidebar() {
+  const s = DATA.stats;
+  $("#n-tasks").textContent = s.live;
+  $("#n-projects").textContent = s.project_count;
+  $("#n-autos").textContent = s.automation_count;
+  $("#n-trash").textContent = s.deleted + s.automation_deleted;
+  $$("#nav .nav-i").forEach(b => b.classList.toggle("on", b.dataset.view === state.view));
+}
+
+// 记录上次生成工具条时的视图 —— 只有视图变了才重建 DOM。
+let barView = null;
+
+function buildBar(force) {
+  if (!force && barView === state.view) return;
+  barView = state.view;
+
+  const bar = $("#bar");
+  let h = "";
+  if (state.view === "tasks" || state.view === "trash") {
+    h += '<div class="search"><input id="q" type="text" placeholder="搜索任务名、路径、产物文件名、提问内容…" autocomplete="off" spellcheck="false"></div>';
+    h += '<select id="f-status"><option value="">全部状态</option>' +
+      ['working|进行中', 'completed|已完成', 'error|出错'].map(x => {
+        const [v, l] = x.split("|"); return '<option value="' + v + '">' + l + "</option>";
+      }).join("") + "</select>";
+    h += '<select id="f-mode"><option value="">全部模式</option>' +
+      ['craft|执行', 'plan|规划', 'ask|问答'].map(x => {
+        const [v, l] = x.split("|"); return '<option value="' + v + '">' + l + "</option>";
+      }).join("") + "</select>";
+    h += '<select id="f-kind"><option value="">全部类型</option>' +
+      ['art|有产物', 'expert|用过专家', 'auto|定时产生'].map(x => {
+        const [v, l] = x.split("|"); return '<option value="' + v + '">' + l + "</option>";
+      }).join("") + "</select>";
+    h += '<select id="f-time"><option value="">全部时间</option>' +
+      [['1', '今天'], ['7', '近 7 天'], ['30', '近 30 天'], ['90', '近 90 天']].map(x =>
+        '<option value="' + x[0] + '">' + x[1] + "</option>").join("") + "</select>";
+    h += '<select id="sort">' +
+      [['updated', '最近更新'], ['oldest', '最久未动'], ['created', '创建时间'], ['name', '任务名'],
+       ['arts', '产物数量'], ['credits', '积分消耗']].map(x =>
+        '<option value="' + x[0] + '">' + x[1] + "</option>").join("") + "</select>";
+    h += '<label class="chk"><input type="checkbox" id="f-cards"> 卡片视图</label>';
+    h += '<button class="btn" id="btn-clear">清空筛选</button>';
+  } else if (state.view === "projects") {
+    h += '<div class="search"><input id="q" type="text" placeholder="搜索项目路径…" autocomplete="off" spellcheck="false"></div>';
+    h += '<select id="f-proj">' +
+      [['real', '只看真实项目'], ['temp', '只看临时目录'], ['all', '全部']].map(x =>
+        '<option value="' + x[0] + '">' + x[1] + "</option>").join("") + "</select>";
+    h += '<button class="btn" id="btn-clear">清空筛选</button>';
+  } else if (state.view === "automations") {
+    h += '<div class="search"><input id="q" type="text" placeholder="搜索定时任务名、内容…" autocomplete="off" spellcheck="false"></div>';
+    h += '<select id="f-auto">' +
+      [['live', '只看启用中'], ['done', '只看已执行完'], ['deleted', '只看已删除'], ['all', '全部']].map(x =>
+        '<option value="' + x[0] + '">' + x[1] + "</option>").join("") + "</select>";
+    h += '<button class="btn" id="btn-clear">清空筛选</button>';
+  } else if (state.view === "library") {
+    h += '<div class="search"><input id="q" type="text" placeholder="在当前目录中过滤文件名…" autocomplete="off" spellcheck="false"></div>';
+  } else if (state.view === "settings") {
+    h += '<button class="btn" id="btn-bak">立即备份数据库</button>';
+    h += '<button class="btn" id="btn-log">查看操作日志</button>';
+  }
+  bar.innerHTML = h;
+
+  // 输入框：**只更新数据，不重新渲染工具条**。
+  //
+  // 这里刻意调 render() 而不是 renderChrome()：render() 里的 buildBar()
+  // 会因为「视图没变」而直接返回，DOM 不动，所以光标和输入法都安然无恙。
+  // 早前这里走的是 render() → renderChrome() → bar.innerHTML = h，
+  // 等于每敲一个字就把输入框删了重建 —— 就是打不了字的元凶。
+  if ($("#q")) {
+    $("#q").addEventListener("input", e => { state.q = e.target.value; renderList(); });
+  }
+  const bind = (id, key) => {
+    const el = $("#" + id);
+    if (el) el.addEventListener("change", e => { state[key] = e.target.value; renderList(); });
+  };
+  bind("f-status", "status"); bind("f-mode", "mode"); bind("f-kind", "kind");
+  bind("f-time", "time"); bind("sort", "sort");
+  bind("f-proj", "projScope"); bind("f-auto", "autoScope");
+
+  const cb = $("#f-cards");
+  if (cb) cb.addEventListener("change", e => { state.cards = e.target.checked; renderList(); });
+
+  const bcl = $("#btn-clear");
+  if (bcl) bcl.addEventListener("click", () => {
+    const f = F();
+    // 逐个重置成默认值，而不是换一个新对象 —— state 上的 getter 指向的是
+    // F() 返回的那个对象，整份替换会让 getter 指到旧对象上去。
+    Object.assign(f, blankFilter());
+    buildBar(true);
+    renderList();
+  });
+  const bb = $("#btn-bak");
+  if (bb) bb.addEventListener("click", doBackup);
+  const bl = $("#btn-log");
+  if (bl) bl.addEventListener("click", doShowLog);
+}
+
+// 把 state 里的筛选值同步到已经存在的控件上（不新建 DOM）。
+function syncBar() {
+  const q = $("#q");
+  // 只在值真的不一样时才写，否则会打断正在进行的输入法组字。
+  if (q && q.value !== state.q) q.value = state.q;
+  const set = (id, v) => { const el = $("#" + id); if (el && el.value !== v) el.value = v; };
+  set("f-status", state.status); set("f-mode", state.mode); set("f-kind", state.kind);
+  set("f-time", state.time); set("sort", state.sort);
+  set("f-proj", state.projScope); set("f-auto", state.autoScope);
+  const cb = $("#f-cards");
+  if (cb && cb.checked !== !!state.cards) cb.checked = !!state.cards;
+}
+
+function renderChrome() {
+  renderHeader();
+  renderSidebar();
+  buildBar(false);
+  syncBar();
+}
+
+/* 可点击的统计卡片 */
+function card(label, value, desc, opts) {
+  opts = opts || {};
+  const cls = ["card", opts.tone ? "c-" + opts.tone : "", opts.flat ? "flat" : "",
+    (opts.quick && state.quick === opts.quick) ? "on" : ""].filter(Boolean).join(" ");
+  const attrs = opts.quick ? ' data-quick="' + opts.quick + '"' : "";
+  return '<div class="' + cls + '"' + attrs + ' title="' + esc(opts.tip || desc || "") + '">' +
+    '<div class="k">' + esc(label) + "</div>" +
+    '<div class="v">' + value + "</div>" +
+    (desc ? '<div class="d">' + desc + "</div>" : "") + "</div>";
+}
+
+/* ================= 视图：总览 ================= */
+function renderOverview() {
+  const s = DATA.stats;
+  let h = "";
+  h += '<div class="cards">';
+  h += card("任务总数", s.total, "有效 " + s.live + " · 已删 " + s.deleted,
+    { tip: "点卡片查看全部任务", quick: "" });
+  h += card("有产物", s.with_artifacts, "共 " + s.artifact_count + " 个产物",
+    { tip: "点我看哪些任务留下了东西" });
+  h += card("无人问津", s.no_artifact, "没有任何产物的任务", { tone: "warn", quick: "no-art", tip: "点我筛出这些任务" });
+  h += card("30 天未动", s.stale_30, "超过一个月没碰过", { tone: "warn", quick: "stale", tip: "点我筛出这些任务" });
+  h += card("近 7 天活跃", s.active_7, "最近一周用过", { tone: "ok", quick: "recent", tip: "点我看最近在忙什么" });
+  h += card("产物丢失", s.lost_files, "文件已不在原位置", { tone: "err", quick: "lost", tip: "点我找出失效产物" });
+  h += card("项目", s.project_count, "另有 " + s.temp_dir_count + " 个临时目录",
+    { tone: "purple", tip: "点卡片进入项目视图" });
+  h += card("定时任务", s.automation_count, s.automation_deleted ? "已删 " + s.automation_deleted + " 个" : "全部启用中",
+    { tone: "purple", tip: "点卡片进入定时任务" });
+  h += card("积分消耗", s.credits_total.toFixed(1), fmtNum(s.tokens_total) + " tokens", { flat: true });
+  h += "</div>";
+
+  h += '<div class="note info"><b>小提示：</b>上面每张卡片都能点 — 点「无人问津」就筛出没有产物的任务，点「30 天未动」就筛出老任务，' +
+    '再点一次取消筛选。这样就能一目了然看出哪些任务该清理了。</div>';
+
+  // 最近活动
+  const recent = sortTasks((DATA.tasks || []).filter(t => !t.deleted)).slice(0, 6);
+  h += '<div class="sect-t" style="margin-top:20px">最近在忙什么</div>';
+  h += '<div class="rows">' + recent.map(renderRow).join("") + "</div>";
+
+  // 数据健康
+  const lostList = [];
+  (DATA.tasks || []).forEach(t => (t.artifacts || []).forEach(a => {
+    if (a.exists === false && lostList.length < 6) lostList.push({ t: t, a: a });
+  }));
+  if (lostList.length) {
+    h += '<div class="sect-t" style="margin-top:22px">失效的产物（点任务名可打开任务）</div>';
+    h += '<div class="rows">' + lostList.map(x =>
+      '<div class="row"><div class="rhead" style="cursor:default">' +
+      '<div class="rmain"><div class="rl1">' +
+      '<span class="rname" data-reopen="' + esc(x.t.id) + '">' + esc(x.a.name) + "</span>" +
+      '<span class="badges"><span class="badge b-lost">文件丢失</span></span></div>' +
+      '<div class="rmeta"><span>属于任务：' + esc(x.t.title).slice(0, 50) + "</span></div>" +
+      '<div class="rprompt mono">' + esc(x.a.path || "") + "</div>" +
+      "</div></div></div>").join("") + "</div>";
+  }
+  return h;
+}
+
+/* ================= 任务行 ================= */
+function renderArtifacts(arts) {
+  if (!arts.length) return '<div style="color:var(--text-3);font-size:12.5px">该任务没有记录到产物</div>';
+  return '<div class="arts">' + arts.map(a => {
+    const [cls, txt] = iconOf(a);
+    const p = a.path || "";
+    const miss = (a.exists === false) ? '<span class="miss" title="文件已不存在">已丢失</span>' : "";
+    return '<div class="art">' +
+      '<span class="ic ic-' + cls + '">' + txt + "</span>" +
+      '<span class="art-n" title="' + esc(a.name) + '" data-open="' + esc(p) + '">' + esc(a.name) + "</span>" +
+      miss +
+      '<span class="art-p mono" title="' + esc(p) + '">' + esc(p) + "</span>" +
+      (a.size != null ? '<span class="art-s">' + fmtSize(a.size) + "</span>" : '<span class="art-s"></span>') +
+      '<span class="art-copy" data-copy="' + esc(p) + '" title="复制完整路径">复制</span>' +
+      (p ? '<span class="art-copy" data-reveal="' + esc(p) + '" title="在资源管理器中显示">定位</span>' : "") +
+      "</div>";
+  }).join("") + "</div>";
+}
+function renderTodos(todos) {
+  if (!todos || !todos.length) return "";
+  const done = todos.filter(t => t.status === "completed").length;
+  return '<div class="sect"><div class="sect-t">任务清单 ' + done + "/" + todos.length + "</div>" +
+    '<div class="todos">' + todos.map(t => {
+      const st = t.status === "completed" ? "done" : t.status === "in_progress" ? "prog" : "";
+      const mk = t.status === "completed" ? "✓" : t.status === "in_progress" ? "•" : "";
+      return '<div class="todo ' + st + '"><span class="mk">' + mk + "</span>" +
+        '<span class="tx">' + esc(t.content) + "</span></div>";
+    }).join("") + "</div></div>";
+}
+function renderUsage(u) {
+  if (!u) return "";
+  const pct = u.context_size > 0 ? Math.min(100, Math.round(u.tokens_used / u.context_size * 100)) : 0;
+  let h = '<div class="sect"><div class="sect-t">用量与消耗</div><div class="ug">';
+  h += '<div class="ug-item"><div class="ug-k">上下文占用</div><div class="ug-v">' +
+    fmtNum(u.tokens_used) + "<small>/ " + fmtNum(u.context_size) + "</small></div>" +
+    '<div class="bar-o"><div class="bar-i" style="width:' + pct + '%"></div></div></div>';
+  h += '<div class="ug-item"><div class="ug-k">积分消耗</div><div class="ug-v">' +
+    (u.credits_total || 0).toFixed(2) + "<small>积分</small></div></div>";
+  h += "</div>";
+  if (u.credits && u.credits.length) {
+    h += '<div class="cr">' + u.credits.map(c =>
+      "<span class=\"cr-i\">" + esc(c.id.slice(0, 8)) + " <b>" + c.amount.toFixed(2) + "</b></span>").join("") + "</div>";
+  }
+  h += "</div>";
+  return h;
+}
+
+function renderRow(t) {
+  const open = openSet.has(t.id);
+  const arts = t.artifacts || [];
+  const nArt = arts.length;
+  const lost = arts.filter(a => a.exists === false).length;
+  const cr = (t.usage || {}).credits_total || 0;
+
+  let badges = statusBadge(t.status) + modeBadge(t.mode);
+  if (t.expert_id) badges += '<span class="badge b-exp">' + esc(t.expert_id) + "</span>";
+  if (t.is_automation) badges += '<span class="badge b-auto">定时</span>';
+  if (t.deleted) badges += '<span class="badge b-del">已删除</span>';
+  if (lost) badges += '<span class="badge b-lost">' + lost + " 个产物丢失</span>";
+  if (!nArt && !t.deleted) badges += '<span class="badge b-nul">无产物</span>';
+  if (isStale(t, 30) && !t.deleted) badges += '<span class="badge b-stale">30天未动</span>';
+
+  let h = '<div class="row' + (open ? " open" : "") + '" data-id="' + esc(t.id) + '">';
+  h += '<div class="rhead" data-toggle="' + esc(t.id) + '">';
+  h += '<span class="caret">▶</span>';
+  h += '<div class="rmain"><div class="rl1">';
+  h += '<span class="rname" data-reopen="' + esc(t.id) + '" title="点击唤起 WorkBuddy 打开这个任务">' + esc(t.title) + "</span>";
+  h += '<span class="badges">' + badges + "</span></div>";
+  h += '<div class="rmeta">';
+  h += '<span title="工作目录">📁 <span class="mono">' + esc(t.cwd || "—") + "</span></span>";
+  h += '<span title="' + esc(t.updated_at || "") + '">🕘 ' + fmtTime(t.updated_at || t.created_at) + " · " + relTime(t.updated_at || t.created_at) + "</span>";
+  h += "</div>";
+  if (t.prompt) h += '<div class="rprompt" title="' + esc(t.prompt) + '">' + esc(t.prompt) + "</div>";
+  h += "</div>";
+  h += '<div class="rright">' +
+    (nArt ? "<span><b>" + nArt + "</b> 产物</span>" : "<span>无产物</span>") +
+    (cr ? "<span><b>" + cr.toFixed(1) + "</b> 积分</span>" : "") +
+    (t.message_count ? "<span><b>" + t.message_count + "</b> 消息</span>" : "") +
+    "</div>";
+  h += "</div>";
+
+  // 详情：和表格展开行共用 renderTaskDetail()，保证两种形态看到的内容一致。
+  h += '<div class="rbody">' + renderTaskDetail(t) + "</div></div>";
+  return h;
+}
+
+/* ================= 视图：任务 ================= */
+//
+// 两种形态：
+//   · 表格（默认）— 带表头，一屏能看几十条，列头可点排序，标题可点直接改
+//   · 卡片（勾「卡片视图」）— 原来的样子，信息密度低但一眼看得清状态
+// 两种形态共用 renderTaskDetail()，所以展开后看到的内容完全一致。
+const TASK_COLS = [
+  // key       表头          排序字段（空=不可排序）  列宽类
+  ["name",    "任务名",      "name",     "c-name"],
+  ["cwd",     "目录",        "",         "c-cwd"],
+  ["created", "创建时间",    "created",  "c-created"],
+  ["updated", "最近更新",    "updated",  "c-updated"],
+  ["auto",    "自动标题",    "",         "c-auto"],
+  ["mode",    "模式",        "",         "c-mode"],
+  ["model",   "模型",        "",         "c-model"],
+  ["jsonl",   "对话记录",    "",         "c-path"],
+  ["title",   "标题（手动）", "name",     "c-title"],
+  ["acts",    "操作",        "",         "c-acts"],
+];
+function sortArrow(key) {
+  if (!key || state.sort !== key) return '<span class="ar">↕</span>';
+  // 名称/最久未动是升序，其余降序 —— 和 sortTasks() 里的 dir 保持一致
+  return '<span class="ar">' + ((key === "name" || key === "oldest") ? "↑" : "↓") + "</span>";
+}
+
+function renderTaskTable(list) {
+  let h = '<div class="lt-wrap"><table class="lt"><thead><tr>';
+  TASK_COLS.forEach(c => {
+    const [k, label, srt, cls] = c;
+    h += '<th class="' + (srt ? "srt" : "") + (srt && state.sort === srt ? " on" : "") + '"' +
+      (srt ? ' data-sortkey="' + srt + '" title="点一下按' + esc(label) + '排序"' : "") + ">" +
+      esc(label) + (srt ? sortArrow(srt) : "") + "</th>";
+  });
+  h += "</tr></thead><tbody>";
+  list.forEach(t => {
+    const open = openSet.has(t.id);
+    const arts = t.artifacts || [];
+    const nArt = arts.length;
+    const lost = arts.filter(a => a.exists === false).length;
+    const hasCustom = !!t.custom_title;
+    const rowCls = (open ? "open" : "") + (t.deleted ? " is-del" : "");
+
+    h += '<tr class="' + rowCls.trim() + '" data-id="' + esc(t.id) + '">';
+
+    // 任务名：点名称 = 打开任务（**不是编辑**）。
+    // 改名统一走「标题（手动）」列的小铅笔，或操作列里的铅笔 ——
+    // 明哥的反馈：点哪都能编太容易误操作，改成必须点图标才进编辑态。
+    h += '<td class="c-name">';
+    h += '<span class="ename' + (hasCustom ? "" : " unnamed") + '" data-reopen="' + esc(t.id) + '" ' +
+      'title="' + esc(t.title) + "（点击唤起 WorkBuddy 打开）" + '">' + esc(t.title) + "</span>";
+    let bg = statusBadge(t.status);
+    if (t.deleted) bg += '<span class="badge b-del">已删除</span>';
+    if (lost) bg += '<span class="badge b-lost">' + lost + " 丢失</span>";
+    if (nArt) bg += '<span class="badge b-mode">' + nArt + " 产物</span>";
+    if (bg) h += '<span class="rbadges">' + bg + "</span>";
+    h += "</td>";
+
+    h += '<td class="c-cwd"><span class="ell mono" title="' + esc(t.cwd || "") + '">' +
+      esc(t.cwd || "—") + "</span></td>";
+    h += '<td class="c-created nowrap">' + fmtTime(t.created_at) + "</td>";
+    h += '<td class="c-updated"' + ' title="' + esc(t.updated_at || "") + '">' +
+      '<span class="ell">' + fmtTime(t.updated_at || t.created_at) + "</span>" +
+      '<span class="sub2">' + relTime(t.updated_at || t.created_at) + "</span></td>";
+    h += '<td class="c-auto"><span class="ell" title="' + esc(t.auto_title || "") + '">' +
+      esc(t.auto_title || "—") + "</span></td>";
+    h += '<td class="c-mode nowrap">' + (modeBadge(t.mode) || '<span style="color:var(--text-3)">—</span>') + "</td>";
+    h += '<td class="c-model"><span class="ell mono" title="' + esc(t.model || "") + '">' +
+      esc(t.model || "—") + "</span></td>";
+    // 「对话记录」列显示什么？
+    // jsonl_path 里最后一段是会话 UUID（形如 bbfd7527-6c11-…），
+    // 对人不构成任何信息 —— 直接摆出来等于白占一列。真正有用的是
+    // 「有没有对话记录」以及「有多少条消息」。所以这列给消息条数，
+    // 完整路径放到 title 里（鼠标悬停可见 / 详情里也能看到全文）。
+    h += '<td class="c-path">';
+    if (t.jsonl_path) {
+      h += '<span class="ell" title="' + esc(t.jsonl_path) + '">' +
+        (t.message_count ? t.message_count + " 条消息" : "有记录") + "</span>";
+    } else {
+      h += '<span style="color:var(--text-3)">无</span>';
+    }
+    h += "</td>";
+
+    // 「标题（手动）」列 —— 文字本身不可编辑，右侧小铅笔才进编辑态。
+    // 这样「想看看标题」和「想改标题」是两件不会互相误触的事。
+    h += '<td class="c-title"><span class="tc">';
+    h += '<span class="ename' + (hasCustom ? "" : " unnamed") + '" title="' +
+      esc(hasCustom ? t.custom_title : "（未设置，点铅笔填写）") + '">' +
+      esc(hasCustom ? t.custom_title : "（未设置）") + "</span>";
+    if (!t.deleted) {
+      h += '<button class="pencil" data-edit="' + esc(t.id) +
+        '" title="修改标题（留空则恢复自动标题）">✎</button>';
+    }
+    h += "</span></td>";
+
+    // 操作列：图标化，省宽度
+    h += '<td class="c-acts"><span class="ico">';
+    h += '<button data-toggle="' + esc(t.id) + '" title="' +
+      (open ? "收起详情" : "展开详情") + '">' + (open ? "▲" : "▼") + "</button>";
+    if (!t.deleted) h += '<button class="dg" data-del="' + esc(t.id) + '" title="删除（进回收站）">🗑</button>';
+    else h += '<button data-restore="' + esc(t.id) + '" title="恢复">↩</button>';
+    h += "</span></td></tr>";
+
+    // 展开行：把原来卡片里的详情整块搬进来
+    if (open) {
+      h += '<tr class="exp-row"><td colspan="' + TASK_COLS.length + '">' +
+        '<div class="exp-in">' + renderTaskDetail(t) + "</div></td></tr>";
+    }
+  });
+  h += "</tbody></table></div>";
+  return h;
+}
+
+function renderTasks() {
+  const all = DATA.tasks || [];
+  const filtered = sortTasks(all.filter(matchTask));
+  if (!filtered.length) {
+    return '<div class="empty"><div class="big">🔍</div><div class="t">' +
+      (state.view === "trash" ? "回收站是空的" : "没有匹配的任务") + "</div>" +
+      "<div>试试放宽筛选条件，或清空搜索关键词</div></div>";
+  }
+  const total = (all || []).filter(t => state.view === "trash" ? t.deleted : !t.deleted).length;
+  let h = '<div class="tools"><span>显示 ' + filtered.length + " / " + total + " 个任务</span>";
+  if (state.quick) {
+    const lbl = { "no-art": "无人问津", stale: "30 天未动", recent: "近 7 天活跃", lost: "产物丢失" }[state.quick] || state.quick;
+    h += '<span class="badge b-run">已筛选：' + esc(lbl) + "</span>";
+  }
+  h += '<span style="margin-left:auto;font-size:11.5px">点标题打开任务 · 点 ✎ 改标题 · 点 ▼ 看详情</span>';
+  h += "</div>";
+
+  if (state.cards) {
+    h += '<div class="rows">' + filtered.map(renderRow).join("") + "</div>";
+  } else {
+    h += renderTaskTable(filtered);
+  }
+  return h;
+}
+
+//
+// 任务详情：表格展开行和卡片展开区共用这一份。
+// 原来这些内容都内联在 renderRow() 里，现在抽出来，避免两处各写一遍
+// 以后改字段要改两个地方、还容易改漏。
+//
+function renderTaskDetail(t) {
+  const arts = t.artifacts || [];
+  const nArt = arts.length;
+  let h = "";
+
+  h += '<div class="sect"><div class="sect-t">任务信息</div><dl class="kv">';
+  h += '<dt>任务 ID</dt><dd class="mono">' + esc(t.id) + "</dd>";
+  h += '<dt>当前标题</dt><dd>' + esc(t.title) + "</dd>";
+  h += '<dt>自动标题</dt><dd>' + esc(t.auto_title || "—") + "</dd>";
+  h += '<dt>手动标题</dt><dd>' + (t.custom_title ? esc(t.custom_title)
+    : '<span style="color:var(--text-3)">未设置（显示的是自动标题）</span>') + "</dd>";
+  h += '<dt>工作目录</dt><dd class="mono">' + esc(t.cwd || "—") + "</dd>";
+  h += '<dt>创建时间</dt><dd>' + fmtTime(t.created_at) + "</dd>";
+  h += '<dt>最近更新</dt><dd>' + fmtTime(t.updated_at) + " · " + relTime(t.updated_at) + "</dd>";
+  if (t.mode) h += "<dt>模式</dt><dd>" + esc(t.mode) + "</dd>";
+  if (t.model) h += "<dt>模型</dt><dd>" + esc(t.model) + "</dd>";
+  if (t.expert_id) h += "<dt>专家</dt><dd>" + esc(t.expert_id) + "</dd>";
+  if (t.message_count) h += "<dt>消息数</dt><dd>" + t.message_count + "</dd>";
+  if (t.jsonl_path) h += '<dt>对话记录</dt><dd class="mono" style="font-size:11.5px">' + esc(t.jsonl_path) + "</dd>";
+  h += "</dl>";
+
+  h += '<div class="dr-acts">';
+  h += '<button class="act pri" data-reopen="' + esc(t.id) + '">↗ 打开这个任务</button>';
+  if (!t.deleted) h += '<button class="act" data-edit="' + esc(t.id) + '">✎ 改标题</button>';
+  if (!t.deleted) h += '<button class="act danger" data-del="' + esc(t.id) + '">🗑 删除</button>';
+  if (t.deleted) h += '<button class="act" data-restore="' + esc(t.id) + '">↩ 恢复</button>';
+  if (t.deleted) h += '<button class="act danger" data-purge="' + esc(t.id) + '">✕ 彻底删除</button>';
+  h += '<button class="act" data-copy="' + esc(t.id) + '">复制任务 ID</button>';
+  if (t.cwd) h += '<button class="act" data-copy="' + esc(t.cwd) + '">复制目录</button>';
+  if (t.cwd) h += '<button class="act" data-reveal="' + esc(t.cwd) + '">打开目录</button>';
+  h += "</div></div>";
+
+  if (nArt) h += '<div class="sect"><div class="sect-t">产物清单 ' + nArt + "</div>" + renderArtifacts(arts) + "</div>";
+  h += renderTodos(t.todos);
+  h += renderUsage(t.usage);
+  if (t.prompt) {
+    h += '<div class="sect"><div class="sect-t">首条提问</div>' +
+      '<div style="font-size:12.5px;color:var(--text-2);background:var(--panel);padding:9px 12px;border-radius:7px;border:1px solid var(--line-2)">' +
+      esc(t.prompt) + "</div></div>";
+  }
+  return h;
+}
+
+/* ================= 视图：项目 ================= */
+function renderProjects() {
+  let ps = (DATA.projects || []).slice();
+  if (state.projScope === "real") ps = ps.filter(p => !p.is_temp);
+  else if (state.projScope === "temp") ps = ps.filter(p => p.is_temp);
+  const q = state.q.toLowerCase();
+  if (q) ps = ps.filter(p => (p.path || "").toLowerCase().includes(q));
+
+  if (!ps.length) return '<div class="empty"><div class="big">📁</div><div class="t">没有匹配的项目</div></div>';
+
+  let h = '<div class="tools"><span>显示 ' + ps.length + " 个" +
+    (state.projScope === "real" ? "真实项目" : state.projScope === "temp" ? "临时目录" : "目录") + "</span></div>";
+  h += '<div class="grid">';
+  ps.forEach(p => {
+    const name = p.path ? p.path.replace(/\\/g, "/").split("/").filter(Boolean).pop() : "?";
+    const dead = !p.exists;
+    h += '<div class="pcard">';
+    h += '<div class="pn">' + (p.is_temp ? "🗂️" : "📁") + " " + esc(name) +
+      (dead ? '<span class="badge b-lost">目录不存在</span>' : "") +
+      (p.is_temp ? '<span class="badge b-nul">临时</span>' : "") + "</div>";
+    h += '<div class="pp mono">' + esc(p.path || "—") + "</div>";
+    h += '<div class="pst">' +
+      "<span><b>" + (p.task_count || 0) + "</b> 任务</span>" +
+      "<span><b>" + (p.artifact_count || 0) + "</b> 产物</span>" +
+      (p.child_count != null ? "<span>顶层 <b>" + p.child_count + "</b> 项</span>" : "") +
+      (p.credits ? "<span><b>" + Number(p.credits).toFixed(1) + "</b> 积分</span>" : "") +
+      "</div>";
+    h += '<div class="pst"><span>最近：' + (p.last_task_at ? relTime(p.last_task_at) : "—") + "</span></div>";
+    h += '<div class="acts">';
+    if (!dead) h += '<button class="act" data-reveal="' + esc(p.path) + '">打开目录</button>';
+    h += '<button class="act" data-copy="' + esc(p.path || "") + '">复制路径</button>';
+    h += '<button class="act" data-proj-tasks="' + esc(p.path || "") + '">看这个项目的任务</button>';
+    h += "</div></div>";
+  });
+  h += "</div>";
+  return h;
+}
+
+/* ================= 视图：定时任务 ================= */
+function rruleText(s) {
+  if (!s) return "一次性";
+  const g = k => (s.match(new RegExp(k + "=([^;]+)")) || [])[1];
+  const f = g("FREQ"), iv = g("INTERVAL"), bh = g("BYHOUR"), bm = g("BYMINUTE");
+  const day = (g("BYDAY") || "").split(",").map(x =>
+    ({ MO: "周一", TU: "周二", WE: "周三", TH: "周四", FR: "周五", SA: "周六", SU: "周日" }[x.trim()] || x)).join("、");
+  const t = (bh || bm) ? " " + String(bh || "0").padStart(2, "0") + ":" + String(bm || "0").padStart(2, "0") : "";
+  if (f === "DAILY") return (iv && iv !== "1" ? "每 " + iv + " 天" : "每天") + t;
+  if (f === "WEEKLY") return "每" + (day || "周") + t;
+  if (f === "MONTHLY") return "每月 " + (g("BYMONTHDAY") || "") + " 日" + t;
+  if (f === "HOURLY") return "每 " + (iv || 1) + " 小时";
+  return s;
+}
+function renderAutomations() {
+  // 「已执行完」= 一次性任务且没有下次运行时间。
+  // WorkBuddy 不会自动把 status 从 ACTIVE 改掉，所以只看 status 会把早就跑完的
+  // 一次性任务算成「启用中」—— 判据必须带上 next_run_at。
+  const isExpired = a => a.schedule_type === "once" &&
+    !a.next_run_at && (!!a.last_run_at || a.status !== "ACTIVE");
+
+  let as = (DATA.automations || []).slice();
+  if (state.autoScope === "live") as = as.filter(a => !a.deleted && !isExpired(a));
+  else if (state.autoScope === "done") as = as.filter(a => !a.deleted && isExpired(a));
+  else if (state.autoScope === "deleted") as = as.filter(a => a.deleted);
+  const q = state.q.toLowerCase();
+  if (q) as = as.filter(a => ((a.name || "") + " " + (a.prompt || "") + " " + (a.cwds || []).join(" ")).toLowerCase().includes(q));
+
+  if (!as.length) return '<div class="empty"><div class="big">⏰</div><div class="t">没有匹配的定时任务</div></div>';
+
+  const live = as.filter(a => !a.deleted).length;
+  const running = as.filter(a => !a.deleted && !isExpired(a)).length;
+  let h = '<div class="tools"><span>共 ' + as.length + " 个（启用中 " + running +
+    (live !== running ? " · 已执行完 " + (live - running) : "") + "）</span></div>";
+  h += '<table class="tbl"><thead><tr>' +
+    "<th>名称</th><th>计划</th><th>状态</th><th>下次运行</th><th>上次运行</th><th>目录</th><th style=\"text-align:right\">操作</th>" +
+    "</tr></thead><tbody>";
+  as.forEach(a => {
+    // 状态判定：
+    //   已删除              -> 已删除
+    //   一次性 + 没有下次运行 -> 已执行完（WorkBuddy 的 status 字段不会自动改，
+    //                          只看 status 会把早就跑完的一次性任务显示成「启用」）
+    //   其余 ACTIVE         -> 启用
+    const st = a.deleted
+      ? '<span class="badge b-del">已删除</span>'
+      : (isExpired(a)
+        ? '<span class="badge b-off" title="这个一次性任务已经执行过了">已执行完</span>'
+        : (a.status === "ACTIVE" ? '<span class="badge b-done">启用</span>' : '<span class="badge b-mode">' + esc(a.status || "—") + "</span>"));
+    h += "<tr>";
+    h += '<td class="c-name"><div class="nm">' + esc(a.name || "(未命名)") + "</div>" +
+      (a.prompt ? '<div class="pth">' + esc(a.prompt.slice(0, 70)) + "</div>" : "") + "</td>";
+    h += '<td class="nowrap">' + esc(rruleText(a.rrule)) +
+      (a.schedule_type === "once" && a.scheduled_at ? '<div class="pth">' + esc(fmtTime(a.scheduled_at)) + "</div>" : "") + "</td>";
+    h += '<td class="nowrap">' + st + "</td>";
+    h += '<td class="nowrap">' + (a.next_run_at ? esc(fmtTime(a.next_run_at)) : "—") + "</td>";
+    h += '<td class="nowrap">' + (a.last_run_at ? esc(fmtTime(a.last_run_at)) + (a.run_count ? '<div class="pth">已运行 ' + a.run_count + " 次</div>" : "") : "—") + "</td>";
+    h += '<td class="pth">' + esc((a.cwds || []).join(", ") || "—") + "</td>";
+    h += '<td style="text-align:right;white-space:nowrap">';
+    if (!a.deleted) {
+      h += '<button class="act" data-auto-rename="' + esc(a.id) + '">改名</button> ';
+      h += '<button class="act" data-auto-toggle="' + esc(a.id) + '">' + (a.status === "ACTIVE" ? "暂停" : "启用") + "</button> ";
+      h += '<button class="act danger" data-auto-del="' + esc(a.id) + '">删除</button>';
+    } else {
+      h += '<button class="act" data-auto-restore="' + esc(a.id) + '">恢复</button>';
+    }
+    h += "</td></tr>";
+  });
+  h += "</tbody></table>";
+  return h;
+}
+
+/* ================= 视图：资料库 ================= */
+function renderLibrary() {
+  const roots = DATA.library_roots || [];
+  if (!roots.length) return '<div class="empty"><div class="big">🗄️</div><div class="t">没有可用的资料库目录</div></div>';
+
+  let h = "";
+  if (!state.libPath) {
+    h += '<div class="note info">这里是本机常用的资料目录。点进去可以浏览文件、用系统程序打开，' +
+      "也可以直接在资源管理器里定位。</div>";
+    h += '<div class="grid">';
+    roots.forEach(r => {
+      h += '<div class="pcard">';
+      h += '<div class="pn">🗄️ ' + esc(r.name) + "</div>";
+      h += '<div class="pp mono">' + esc(r.path) + "</div>";
+      h += '<div class="pst">' +
+        (r.child_count != null ? "<span>顶层 <b>" + r.child_count + "</b> 项</span>" : "") +
+        (r.top_bytes ? "<span>直接文件 <b>" + fmtSize(r.top_bytes) + "</b></span>" : "") +
+        "</div>";
+      h += '<div class="pp" style="color:var(--text-2);font-size:12.5px">' + esc(r.desc || "") + "</div>";
+      h += '<div class="acts">' +
+        '<button class="act pri" data-lib="' + esc(r.path) + '">浏览</button>' +
+        '<button class="act" data-reveal="' + esc(r.path) + '">在资源管理器打开</button>' +
+        "</div></div>";
+    });
+    h += "</div>";
+    return h;
+  }
+
+  // 浏览中：从 DATA 没有实时目录内容，需向服务端要
+  const ent = window.__LIB_CACHE__ && window.__LIB_CACHE__.path === state.libPath ? window.__LIB_CACHE__ : null;
+  h += '<div class="crumb">';
+  if (ent && ent.parent) h += '<span class="lnk" data-lib="' + esc(ent.parent) + '">↑ 上一级</span><span class="sep">/</span>';
+  h += '<b class="mono">' + esc(state.libPath) + "</b>";
+  h += '<button class="act" style="margin-left:auto" data-lib-root="1">返回资料库首页</button>';
+  h += '<button class="act" data-reveal="' + esc(state.libPath) + '">在资源管理器打开</button>';
+  h += '<button class="act" data-copy="' + esc(state.libPath) + '">复制路径</button>';
+  h += "</div>";
+
+  if (!ent) {
+    h += '<div class="empty"><div class="t">目录内容未加载</div>' +
+      (SERVER ? "<div>正在读取…</div>" :
+        "<div>静态模式下无法浏览子目录，请用「启动管理中心.bat」打开</div>") + "</div>";
+    return h;
+  }
+  let list = ent.entries || [];
+  const q = state.q.toLowerCase();
+  if (q) list = list.filter(e => (e.name || "").toLowerCase().includes(q));
+  if (!list.length) return h + '<div class="empty"><div class="big">📂</div><div class="t">这个目录是空的</div></div>';
+
+  h += '<table class="tbl"><thead><tr><th>名称</th><th>大小</th><th>修改时间</th><th style="text-align:right">操作</th></tr></thead><tbody>';
+  list.forEach(e => {
+    h += "<tr>";
+    h += '<td><span class="nm" style="cursor:' + (e.is_dir ? "pointer" : "pointer") + '" ' +
+      (e.is_dir ? 'data-lib="' + esc(e.path) + '"' : 'data-open="' + esc(e.path) + '"') + ">" +
+      (e.is_dir ? "📁 " : "📄 ") + esc(e.name) + "</span></td>";
+    h += "<td>" + (e.is_dir ? "—" : fmtSize(e.size)) + "</td>";
+    h += "<td>" + esc(fmtTime(e.mtime)) + "</td>";
+    h += '<td style="text-align:right;white-space:nowrap">';
+    if (!e.is_dir) h += '<button class="act" data-open="' + esc(e.path) + '">打开</button> ';
+    h += '<button class="act" data-reveal="' + esc(e.path) + '">定位</button> ';
+    h += '<button class="act" data-copy="' + esc(e.path) + '">复制路径</button>';
+    h += "</td></tr>";
+  });
+  h += "</tbody></table>";
+  if (ent.truncated) h += '<div class="note">目录内容超过上限，只显示了前 ' + list.length + " 项。</div>";
+
+  // 异步加载真实内容
+  if (SERVER) setTimeout(loadLib, 0);
+  return h;
+}
+function loadLib() {
+  if (!SERVER || !state.libPath) return;
+  fetch("/api/ls?path=" + encodeURIComponent(state.libPath))
+    .then(r => r.json()).then(j => {
+      if (!j.ok) { toast("读取目录失败：" + (j.error || ""), "err"); return; }
+      window.__LIB_CACHE__ = { path: state.libPath, parent: j.parent, entries: j.entries, truncated: j.truncated };
+      render();
+    }).catch(() => toast("读取目录失败", "err"));
+}
+
+/* ================= 视图：设置与日志 ================= */
+function renderSettings() {
+  const s = DATA.stats;
+  let h = "";
+  h += '<div class="cards">';
+  h += card("数据库", fmtSize(s.db_size || 0), esc(s.db_path || "").slice(-40), { flat: true });
+  h += card("备份", (s.backup_count || 0) + " 份", "改动前自动备份", { flat: true });
+  h += card("操作记录", (s.log_count || 0) + " 条", "改名 / 删除 / 恢复", { flat: true });
+  h += "</div>";
+
+  h += '<div class="note"><b>安全说明：</b>所有修改操作（改名、删除、恢复）执行前都会自动备份数据库，' +
+    '并记录到操作日志。备份保留份数可在下面「资料库目录」上方查看和修改。</div>';
+
+  // ---- 资料库目录管理 ----
+  // 这些目录是配置出来的，不是写死的；首次启动会自动探测本机情况生成一份。
+  // 换电脑、或者想把某个文件夹加进来的时候，都在这里改。
+  h += '<div class="sect-t" style="margin-top:20px">资料库目录</div>';
+  h += '<div class="note">这里列出的目录会出现在「资料库」页里，可以逐个点进去浏览。' +
+    '配置存在 <span class="mono">config.json</span>，改完刷新页面即生效，不用重启。</div>';
+  h += '<div id="lib-roots"><div class="empty">正在读取…</div></div>';
+  h += '<div class="acts" style="margin-top:12px">' +
+    '<button class="act pri" id="btn-add-root">添加目录</button>' +
+    '<button class="act" id="btn-probe">重新自动探测</button>' +
+    '<button class="act" id="btn-save-root">保存</button>' +
+    "</div>";
+  // 端口与备份份数放在这里一起改，省得让人去手抠 JSON
+  h += '<div class="sect-t" style="margin-top:20px">运行参数</div>';
+  h += '<table class="tbl"><tbody>' +
+    '<tr><td style="width:180px;color:var(--text-3)">服务端口</td>' +
+    '<td><input type="number" id="cfg-port" min="1024" max="65535" style="width:110px">' +
+    ' <span style="color:var(--text-3);font-size:12px">被占用时自动往后找，下次启动生效</span></td></tr>' +
+    '<tr><td style="color:var(--text-3)">备份保留份数</td>' +
+    '<td><input type="number" id="cfg-keep" min="1" max="64" style="width:110px">' +
+    ' <span style="color:var(--text-3);font-size:12px">改动前自动备份，超出后按批次清理</span></td></tr>' +
+    "</tbody></table>";
+  h += '<div class="acts" style="margin-top:12px">' +
+    '<button class="act pri" id="btn-save-cfg">保存运行参数</button></div>';
+
+  // ---- 环境体检 ----
+  h += '<div class="sect-t" style="margin-top:20px">环境体检</div>';
+  h += '<div class="note">检查这台电脑上跑这个工具需要的东西是否齐全 —— ' +
+    'Python 版本、数据目录、配置权限、端口占用等。换个环境跑不动时，先点这里。</div>';
+  h += '<div id="doctor-box"><div class="empty">还没检查</div></div>';
+  h += '<div class="acts" style="margin-top:12px">' +
+    '<button class="act pri" id="btn-doctor">开始体检</button>' +
+    '<button class="act" id="btn-doctor-copy">复制结果</button></div>';
+
+  h += '<div class="sect-t">数据来源</div>';
+  h += '<table class="tbl"><tbody>';
+  [["任务 / 用量 / 定时任务", esc(s.db_path || "")],
+   ["产物清单", esc(s.artifact_dir || "artifact-index/")],
+   ["对话记录", esc(s.projects_dir || "projects/")],
+   ["生成时间", esc(DATA.generated_at || "")]
+  ].forEach(x => {
+    h += '<tr><td style="width:180px;color:var(--text-3)">' + x[0] + '</td><td class="pth mono">' + x[1] + "</td></tr>";
+  });
+  h += "</tbody></table>";
+
+  h += '<div class="acts" style="margin-top:16px">' +
+    '<button class="act pri" id="btn-bak2">立即备份数据库</button>' +
+    '<button class="act" id="btn-log2">查看操作日志</button>' +
+    '<button class="act" data-reveal="' + esc(s.backup_dir || "") + '">打开备份目录</button>' +
+    "</div>";
+
+  if (s.backups && s.backups.length) {
+    h += '<div class="sect-t" style="margin-top:20px">最近的备份</div>';
+    h += '<table class="tbl"><thead><tr><th>备份文件</th><th>大小</th><th>时间</th><th></th></tr></thead><tbody>';
+    s.backups.forEach(b => {
+      h += "<tr><td class=\"mono\" style=\"font-size:11.5px\">" + esc(b.name) + "</td>" +
+        "<td>" + fmtSize(b.size) + "</td><td>" + esc(fmtTime(b.mtime)) + "</td>" +
+        '<td style="text-align:right"><button class="act" data-reveal="' + esc(b.path) + '">定位</button></td></tr>';
+    });
+    h += "</tbody></table>";
+  }
+
+  setTimeout(() => {
+    const b2 = $("#btn-bak2"); if (b2) b2.addEventListener("click", doBackup);
+    const l2 = $("#btn-log2"); if (l2) l2.addEventListener("click", doShowLog);
+    // 资料库 / 运行参数 / 体检 —— 这三块都要先问服务端拿实时数据，
+    // 不能直接用 DATA（那份是采集时固化的快照，改完配置不会跟着变）
+    loadCfg();
+    const ba = $("#btn-add-root"); if (ba) ba.addEventListener("click", addRoot);
+    const bp = $("#btn-probe"); if (bp) bp.addEventListener("click", probeRoots);
+    const bs = $("#btn-save-root"); if (bs) bs.addEventListener("click", saveRoots);
+    const bc = $("#btn-save-cfg"); if (bc) bc.addEventListener("click", saveRunCfg);
+    const bd = $("#btn-doctor"); if (bd) bd.addEventListener("click", runDoctor);
+    const bc2 = $("#btn-doctor-copy"); if (bc2) bc2.addEventListener("click", copyDoctor);
+  }, 0);
+  return h;
+}
+
+/* ---- 资料库目录 / 运行参数 ---- */
+
+// 页面上的临时状态。所有改动先留在这里，点「保存」才回写服务端 ——
+// 免得每敲一个字符就落盘一次，改错了也没法反悔。
+let CFG = null, CFG_ROOTS = [];
+
+function loadCfg() {
+  api("/api/config").then(j => {
+    if (!j.ok) { $("#lib-roots").innerHTML = '<div class="empty">读取失败：' + esc(j.error || "") + "</div>"; return; }
+    CFG = j;
+    CFG_ROOTS = (j.library_roots || []).map(r => ({ name: r.name, path: r.path, desc: r.desc || "", missing: r.missing }));
+    paintRoots();
+    const pe = $("#cfg-port"); if (pe) pe.value = j.port;
+    const ke = $("#cfg-keep"); if (ke) ke.value = j.keep_backups;
+  }).catch(() => {
+    const el = $("#lib-roots");
+    if (el) el.innerHTML = '<div class="empty">读取失败（服务未运行？纯静态页不支持修改配置）</div>';
+  });
+}
+
+function paintRoots() {
+  const box = $("#lib-roots");
+  if (!box) return;
+  if (!CFG_ROOTS.length) {
+    box.innerHTML = '<div class="empty">还没有任何目录。点「添加目录」加一个，或点「重新自动探测」让工具自己找。</div>';
+    return;
+  }
+  let h = '<table class="tbl"><thead><tr><th style="width:150px">显示名</th><th>路径</th><th style="width:70px"></th></tr></thead><tbody>';
+  CFG_ROOTS.forEach((r, i) => {
+    h += "<tr>" +
+      '<td><input type="text" data-ri="' + i + '" data-rf="name" value="' + esc(r.name) + '" style="width:100%"></td>' +
+      '<td><input type="text" data-ri="' + i + '" data-rf="path" value="' + esc(r.path) + '" ' +
+        'class="mono" style="width:100%;font-size:11.5px">' +
+        (r.missing ? '<div style="color:var(--warn);font-size:11.5px;margin-top:3px">这个目录不存在（可能被删了或换了电脑）</div>' : "") +
+      "</td>" +
+      '<td style="text-align:right"><button class="act" data-rdel="' + i + '">删除</button></td></tr>';
+  });
+  h += "</tbody></table>";
+  box.innerHTML = h;
+  // 输入框改的是内存里的副本，不是 CFG_ROOTS 本身 —— 保存时才真正提交
+  box.querySelectorAll("input[data-ri]").forEach(inp => {
+    inp.addEventListener("input", e => {
+      const i = +e.target.dataset.ri, f = e.target.dataset.rf;
+      if (CFG_ROOTS[i]) CFG_ROOTS[i][f] = e.target.value;
+    });
+  });
+  box.querySelectorAll("button[data-rdel]").forEach(b => {
+    b.addEventListener("click", e => {
+      const i = +e.currentTarget.dataset.rdel;
+      CFG_ROOTS.splice(i, 1);
+      paintRoots();
+    });
+  });
+}
+
+function addRoot() {
+  CFG_ROOTS.push({ name: "新目录", path: "", desc: "" });
+  paintRoots();
+}
+
+function probeRoots() {
+  api("/api/suggest").then(j => {
+    if (!j.ok) { toast("探测失败：" + (j.error || ""), "err"); return; }
+    const found = j.roots || [];
+    if (!found.length) { toast("没有探测到可用目录", "err"); return; }
+    // 追加而不是替换 —— 用户手动加的那些不该被探测结果冲掉。
+    // 已经有的路径跳过，避免重复点几次堆出一堆一样的。
+    const have = new Set(CFG_ROOTS.map(r => (r.path || "").toLowerCase()));
+    let added = 0;
+    found.forEach(r => {
+      if (!have.has(r.path.toLowerCase())) {
+        CFG_ROOTS.push({ name: r.name, path: r.path, desc: r.desc || "" });
+        added++;
+      }
+    });
+    paintRoots();
+    toast(added ? ("探测到 " + added + " 个新目录，点「保存」生效") : "没有新的目录", "ok");
+  }).catch(() => {});
+}
+
+function saveRoots() {
+  const payload = CFG_ROOTS
+    .filter(r => (r.path || "").trim())
+    .map(r => ({ name: r.name, path: r.path.trim(), desc: r.desc || "" }));
+  api("/api/config", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ library_roots: payload })
+  }).then(j => {
+    if (j.ok) { toast(j.message || "已保存", "ok"); loadCfg(); }
+    else toast("保存失败：" + (j.error || ""), "err");
+  }).catch(() => {});
+}
+
+function saveRunCfg() {
+  const p = $("#cfg-port"), k = $("#cfg-keep");
+  api("/api/config", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      port: p ? p.value : undefined,
+      keep_backups: k ? k.value : undefined
+    })
+  }).then(j => {
+    if (j.ok) { toast(j.message || "已保存", "ok"); loadCfg(); }
+    else toast("保存失败：" + (j.error || ""), "err");
+  }).catch(() => {});
+}
+
+/* ---- 环境体检 ---- */
+
+let DOCTOR_TEXT = "";
+
+function runDoctor() {
+  const box = $("#doctor-box");
+  if (box) box.innerHTML = '<div class="empty">正在检查…</div>';
+  api("/api/doctor").then(j => {
+    if (!j.ok) { if (box) box.innerHTML = '<div class="empty">体检失败：' + esc(j.error || "") + "</div>"; return; }
+    renderDoctor(j);
+  }).catch(() => {
+    if (box) box.innerHTML = '<div class="empty">体检失败（服务未运行？）</div>';
+  });
+}
+
+function renderDoctor(rep) {
+  const box = $("#doctor-box");
+  if (!box) return;
+  const rows = rep.results || [];
+  const s = rep.summary || { ok: 0, warn: 0, bad: 0 };
+  const cls = { ok: "b-done", warn: "b-warn", bad: "b-err" };
+  const word = { ok: "正常", warn: "注意", bad: "问题" };
+  let h = '<div class="box">';
+  h += '<div style="margin-bottom:8px">正常 <b style="color:var(--ok)">' + s.ok + "</b> · 注意 <b>" +
+    s.warn + "</b> · 问题 <b>" + s.bad + "</b></div>";
+  let last = null;
+  rows.forEach(r => {
+    if (r.group !== last) {
+      h += '<div style="margin:10px 0 4px;font-size:11.5px;color:var(--text-3)">' + esc(r.group) + "</div>";
+      last = r.group;
+    }
+    h += '<div style="margin-bottom:6px;font-size:12.5px">' +
+      '<span class="badge ' + (cls[r.level] || "") + '">' + (word[r.level] || r.level) + "</span> " +
+      "<b>" + esc(r.name) + "</b> " + esc(r.detail || "") +
+      (r.hint ? '<div style="color:var(--text-3);margin:2px 0 0 6px">→ ' + esc(r.hint) + "</div>" : "") +
+      "</div>";
+  });
+  if (rep.config_path) {
+    h += '<div style="margin-top:10px;font-size:11.5px;color:var(--text-3)">配置文件：' +
+      '<span class="mono">' + esc(rep.config_path) + "</span></div>";
+  }
+  h += "</div>";
+  box.innerHTML = h;
+
+  // 存一份纯文本，方便用户直接粘到聊天窗口发人求助 ——
+  // 这是「别人电脑上跑不动」最常见的求助方式，别让人手抄。
+  DOCTOR_TEXT = "WorkBuddy 管理中心 · 环境体检\n" +
+    "正常 " + s.ok + " / 注意 " + s.warn + " / 问题 " + s.bad + "\n" +
+    rows.map(r => "[" + (word[r.level] || r.level) + "] " + r.name + "：" + (r.detail || "") +
+      (r.hint ? "  → " + r.hint : "")).join("\n") +
+    "\n配置文件：" + (rep.config_path || "");
+}
+
+function copyDoctor() {
+  if (!DOCTOR_TEXT) { toast("先点「开始体检」", "err"); return; }
+  const done = () => toast("体检结果已复制，可直接粘贴给别人", "ok");
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(DOCTOR_TEXT).then(done).catch(() => fallbackCopy(DOCTOR_TEXT, done));
+  } else {
+    fallbackCopy(DOCTOR_TEXT, done);
+  }
+}
+
+function fallbackCopy(text, done) {
+  // navigator.clipboard 在非 https / 非 localhost 下不可用，
+  // 而这个页面可能被 file:// 直接打开，所以必须留一条兜底路径
+  const ta = document.createElement("textarea");
+  ta.value = text;
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.select();
+  try { document.execCommand("copy"); done(); }
+  catch (e) { toast("复制失败，请手动选中", "err"); }
+  document.body.removeChild(ta);
+}
+
+/* ================= 写入操作 ================= */
+function doBackup() {
+  api("/api/backup").then(j => {
+    if (j.ok) { toast("备份完成：" + (j.name || ""), "ok"); refreshData(); }
+    else toast("备份失败：" + (j.error || ""), "err");
+  }).catch(() => {});
+}
+function doShowLog() {
+  api("/api/log?limit=60").then(j => {
+    if (!j.ok) { toast("读取日志失败", "err"); return; }
+    const rows = j.entries || [];
+    if (!rows.length) { dialog("操作日志", "<p>还没有任何修改操作记录。</p>"); return; }
+    const html = '<div class="box" style="max-height:46vh;overflow-y:auto">' +
+      rows.map(r => '<div style="margin-bottom:8px;font-size:12.5px">' +
+        '<span class="mono" style="color:var(--text-3)">' + esc(r.time.replace("T", " ")) + "</span> " +
+        '<span class="badge ' + (r.ok ? "b-done" : "b-err") + '">' + esc(r.action) + "</span> " +
+        esc(r.detail || "") + "</div>").join("") + "</div>";
+    dialog("操作日志（最近 " + rows.length + " 条）", html);
+  }).catch(() => {});
+}
+/* 行内改标题 —— 在列表里直接改，不弹窗。
+ *
+ * 走的是同一个 /api/rename 接口，和弹窗版 doRename() 完全等价，
+ * 只是把输入框直接放到单元格里。两个细节：
+ *   1. blur 和 Enter 都可能触发保存，用一个 done 标志防止提交两次
+ *   2. Esc 取消时也要把 done 置上，否则随后的 blur 又把改动提交了
+ */
+function startInlineEdit(td) {
+  if (td.querySelector("input.rin")) return;
+  const id = td.querySelector("[data-edit]").dataset.edit;
+  const t = (DATA.tasks || []).find(x => x.id === id);
+  if (!t) return;
+  const cur = t.custom_title || "";
+  const span = td.querySelector("[data-edit]");
+  const html = span.innerHTML;
+  span.style.display = "none";
+
+  const inp = document.createElement("input");
+  inp.className = "rin";
+  inp.type = "text";
+  inp.maxLength = 200;
+  inp.value = cur;                     // 只填「手动标题」，不填自动标题 —— 否则
+  inp.placeholder = "留空 = 用自动标题";  // 一保存就把自动标题误当成手动的存进去
+  td.appendChild(inp);
+  inp.focus();
+  inp.select();
+
+  let done = false;
+  const finish = (save) => {
+    if (done) return;
+    done = true;
+    const v = inp.value.trim();
+    inp.remove();
+    span.style.display = "";
+    if (!save) return;
+    // 没变就直接返回，避免白写一次数据库 + 白备份一份
+    if (v === cur) return;
+    api("/api/rename", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: id, title: v })
+    }).then(j => {
+      if (j.ok) { toast(j.message || "已改名", "ok"); refreshData(); }
+      else { toast("改名失败：" + (j.error || ""), "err"); span.innerHTML = html; }
+    }).catch(() => { span.innerHTML = html; });
+  };
+  inp.addEventListener("keydown", e => {
+    if (e.key === "Enter") { e.preventDefault(); finish(true); }
+    else if (e.key === "Escape") { e.preventDefault(); finish(false); }
+    e.stopPropagation();   // 别让 Esc 冒泡到全局（那里会去清空搜索框）
+  });
+  inp.addEventListener("blur", () => finish(true));
+  inp.addEventListener("click", e => e.stopPropagation());
+}
+
+function doRename(id) {
+  const t = (DATA.tasks || []).find(x => x.id === id);
+  if (!t) return;
+  const cur = t.custom_title || "";
+  dialog("修改任务名", [
+    "<p>给这个任务起一个更好记的名字。留空并确定，就恢复成自动生成的标题。</p>",
+    '<div class="box"><b style="color:var(--text)">当前标题</b><br>' + esc(t.title) + "</div>",
+    (t.auto_title ? '<div style="font-size:12.5px;color:var(--text-3)">自动标题：' + esc(t.auto_title) + "</div>" : ""),
+    '<input type="text" id="rename-in" value="' + esc(cur || t.title) + '" maxlength="200" placeholder="输入新的任务名">'
+  ].join("\n"), [
+    {
+      label: "保存", cls: "btn primary", onClick: () => {
+        const inp = $("#rename-in");
+        const v = inp ? inp.value.trim() : "";
+        api("/api/rename", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: id, title: v })
+        }).then(j => {
+          if (j.ok) { toast(j.message || "已改名", "ok"); refreshData(); }
+          else { toast("改名失败：" + (j.error || ""), "err"); }
+        }).catch(() => {});
+      }
+    },
+    { label: "取消" }
+  ], { onOpen: () => { const i = $("#rename-in"); if (i) { i.focus(); i.select(); } } });
+}
+function doDelete(id) {
+  api("/api/preview?id=" + encodeURIComponent(id)).then(pv => {
+    if (!pv.ok) { toast("预检失败：" + (pv.error || ""), "err"); return; }
+    const body = [
+      "<p style='color:var(--err);font-weight:600'>这个操作会把任务从 WorkBuddy 里移除。</p>",
+      '<div class="box">',
+      "<b style='color:var(--text)'>将要删除的任务</b><br>",
+      esc(pv.title || "(未命名)"),
+      "</div>",
+      "<p><b>会发生什么：</b></p>",
+      "<ul>",
+      "<li>任务从 WorkBuddy 列表里<b>消失</b>（数据库标记为已删除）</li>",
+      "<li>任务的对话记录、产物文件<b>不会被删除</b>，仍然在磁盘上</li>",
+      "<li>可以随时在「回收站」里点恢复</li>",
+      "</ul>",
+      "<p style='font-size:12.5px;color:var(--text-3)'>执行前会自动备份数据库。</p>"
+    ].join("\n");
+    dialog("确认删除任务？", body, [
+      {
+        label: "确认删除", cls: "btn danger", onClick: () => {
+          api("/api/delete", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: id })
+          }).then(j => {
+            if (j.ok) { toast(j.message || "已删除", "ok"); refreshData(); }
+            else toast("删除失败：" + (j.error || ""), "err");
+          }).catch(() => {});
+        }
+      },
+      { label: "取消" }
+    ], { warn: true });
+  }).catch(() => {});
+}
+function doRestore(id) {
+  api("/api/restore", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id: id })
+  }).then(j => {
+    if (j.ok) { toast(j.message || "已恢复", "ok"); refreshData(); }
+    else toast("恢复失败：" + (j.error || ""), "err");
+  }).catch(() => {});
+}
+function doPurge(id) {
+  api("/api/preview?id=" + encodeURIComponent(id)).then(pv => {
+    if (!pv.ok) { toast("预检失败：" + (pv.error || ""), "err"); return; }
+    const body = [
+      "<p style='color:var(--err);font-weight:600'>这是不可恢复的操作，请仔细确认。</p>",
+      '<div class="box">',
+      "<b style='color:var(--text)'>将要彻底删除的任务</b><br>",
+      esc(pv.title || "(未命名)"),
+      "</div>",
+      "<p><b>会发生什么：</b></p>",
+      "<ul>",
+      "<li>从数据库里<b>物理删除</b>这个任务记录</li>",
+      "<li>连带删除它的用量统计（" + (pv.usage_rows || 0) + " 行）</li>",
+      "<li><b>无法恢复</b>——回收站里也找不回来</li>",
+      "<li>但磁盘上的对话记录文件和产物文件<b>不受影响</b></li>",
+      "</ul>",
+      "<p>如果只是想让它从列表消失，请改用「删除」，那样可以恢复。</p>",
+      "<p>确定要继续的话，请在下面输入 <b>DELETE</b>：</p>",
+      '<input type="text" id="purge-in" placeholder="输入 DELETE 以确认">'
+    ].join("\n");
+    dialog("彻底删除任务？", body, [
+      {
+        label: "彻底删除", cls: "btn danger", onClick: () => {
+          const inp = $("#purge-in");
+          const v = inp ? inp.value.trim() : "";
+          if (v !== "DELETE") { toast("请输入 DELETE 确认", "err"); return true; }
+          api("/api/purge", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: id, confirm: v })
+          }).then(j => {
+            if (j.ok) { toast(j.message || "已彻底删除", "ok"); refreshData(); }
+            else toast("失败：" + (j.error || ""), "err");
+          }).catch(() => {});
+        }
+      },
+      { label: "取消" }
+    ], { warn: true, onOpen: () => { const i = $("#purge-in"); if (i) i.focus(); } });
+  }).catch(() => {});
+}
+
+/* 定时任务写入 */
+function doAutoRename(id) {
+  const a = (DATA.automations || []).find(x => x.id === id);
+  if (!a) return;
+  dialog("修改定时任务名", [
+    '<div class="box"><b style="color:var(--text)">当前名称</b><br>' + esc(a.name || "") + "</div>",
+    '<input type="text" id="an-in" value="' + esc(a.name || "") + '" maxlength="200" placeholder="输入新的名称">'
+  ].join("\n"), [
+    {
+      label: "保存", cls: "btn primary", onClick: () => {
+        const v = $("#an-in") ? $("#an-in").value.trim() : "";
+        api("/api/auto-rename", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: id, name: v })
+        }).then(j => {
+          if (j.ok) { toast(j.message || "已改名", "ok"); refreshData(); }
+          else toast("失败：" + (j.error || ""), "err");
+        }).catch(() => {});
+      }
+    },
+    { label: "取消" }
+  ], { onOpen: () => { const i = $("#an-in"); if (i) { i.focus(); i.select(); } } });
+}
+function doAutoToggle(id) {
+  const a = (DATA.automations || []).find(x => x.id === id);
+  if (!a) return;
+  const toPause = a.status === "ACTIVE";
+  dialog(toPause ? "暂停这个定时任务？" : "启用这个定时任务？", [
+    '<div class="box">' + esc(a.name || "") + "<br>" +
+    '<span style="font-size:12.5px;color:var(--text-3)">' + esc(rruleText(a.rrule)) + "</span></div>",
+    toPause ? "<p>暂停后它不会再按计划自动运行，可以随时改回来。</p>"
+            : "<p>启用后它会按计划自动运行。</p>"
+  ].join("\n"), [
+    {
+      label: toPause ? "暂停" : "启用", cls: "btn primary", onClick: () => {
+        api("/api/auto-toggle", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: id })
+        }).then(j => {
+          if (j.ok) { toast(j.message || "已切换", "ok"); refreshData(); }
+          else toast("失败：" + (j.error || ""), "err");
+        }).catch(() => {});
+      }
+    },
+    { label: "取消" }
+  ]);
+}
+function doAutoDelete(id) {
+  api("/api/auto-preview?id=" + encodeURIComponent(id)).then(pv => {
+    if (!pv.ok) { toast("预检失败：" + (pv.error || ""), "err"); return; }
+    dialog("确认删除定时任务？", [
+      "<p style='color:var(--err);font-weight:600'>删除后它不会再自动运行。</p>",
+      '<div class="box">',
+      "<b style='color:var(--text)'>" + esc(pv.name || "") + "</b><br>",
+      '<span style="font-size:12.5px;color:var(--text-3)">' + esc(rruleText(pv.rrule)) + "</span>",
+      "</div>",
+      "<ul>",
+      "<li>计划将停止执行</li>",
+      "<li>已有 " + (pv.run_count || 0) + " 次运行记录会被保留</li>",
+      "<li>可以在列表右上角切到「只看已删除」然后恢复</li>",
+      "</ul>",
+      "<p style='font-size:12.5px;color:var(--text-3)'>执行前会自动备份数据库。</p>"
+    ].join("\n"), [
+      {
+        label: "确认删除", cls: "btn danger", onClick: () => {
+          api("/api/auto-delete", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: id })
+          }).then(j => {
+            if (j.ok) { toast(j.message || "已删除", "ok"); refreshData(); }
+            else toast("失败：" + (j.error || ""), "err");
+          }).catch(() => {});
+        }
+      },
+      { label: "取消" }
+    ], { warn: true });
+  }).catch(() => {});
+}
+function doAutoRestore(id) {
+  api("/api/auto-restore", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id: id })
+  }).then(j => {
+    if (j.ok) { toast(j.message || "已恢复", "ok"); refreshData(); }
+    else toast("失败：" + (j.error || ""), "err");
+  }).catch(() => {});
+}
+
+/* ================= 主渲染 ================= */
+//
+// 分三层，边界很清楚：
+//   render()      完整渲染（切视图、刷新数据时用）—— 会重建工具条
+//   renderList()  只重画内容区（打字、改筛选条件时用）—— **绝不碰工具条**
+//   renderChrome() 只画顶栏/侧栏/工具条
+//
+// 打字走 renderList() 是关键：它不碰 #bar，输入框 DOM 一直活着，
+// 光标和输入法组字都不会被打断。（这就是「打不了字」的修复点。）
+function render() {
+  renderChrome();
+  renderList();
+}
+function renderList() {
+  // 快捷筛选/搜索条件变化会改变「当前结果条数」，顶栏可能要有提示，
+  // 但顶栏不含输入控件，重建它不会影响打字，所以这里是安全的。
+  renderSidebar();
+  let h = "";
+  if (state.view === "overview") h = renderOverview();
+  else if (state.view === "tasks" || state.view === "trash") h = renderTasks();
+  else if (state.view === "projects") h = renderProjects();
+  else if (state.view === "automations") h = renderAutomations();
+  else if (state.view === "library") h = renderLibrary();
+  else if (state.view === "settings") h = renderSettings();
+  $("#main").innerHTML = h;
+}
+
+/* ================= 事件委托 ================= */
+document.addEventListener("click", e => {
+  // 侧栏
+  const nav = e.target.closest("#nav .nav-i");
+  if (nav) {
+    state.view = nav.dataset.view;
+    if (state.view !== "library") { state.libPath = ""; }
+    // 这里**不再**清 q / quick 等筛选条件。理由：筛选条件已经是按视图分开存的
+    // （见 state.filters），切过去读到的是那个视图自己的那一份，
+    // 天然不会带上别的页面的关键词。这里再清一遍反而会把用户
+    // 「切走再切回来，搜索条件还在」的预期破坏掉。
+    render();
+    return;
+  }
+  // 统计卡片
+  const cd = e.target.closest("[data-quick]");
+  if (cd && !cd.classList.contains("flat")) {
+    const qv = cd.dataset.quick;
+    state.quick = (state.quick === qv) ? "" : qv;
+    state.view = "tasks";
+    render();
+    return;
+  }
+
+  // 表头点击排序（只在表格式列表里有）
+  const th = e.target.closest("th.srt[data-sortkey]");
+  if (th) {
+    const k = th.dataset.sortkey;
+    // 点同一列 = 切换升/降；点新列 = 用它排序。
+    // 这里的「切换升序」只对支持双向的列有意义，其余保持默认方向即可 ——
+    // sortTasks() 内部按列名决定方向，所以这里只需要换 key。
+    if (state.sort === k) {
+      state.sort = (k === "name" || k === "oldest") ? "updated" : (k === "created" ? "oldest" : "name");
+    } else {
+      state.sort = k;
+    }
+    syncBar();
+    renderList();
+    return;
+  }
+
+  const el = e.target.closest("[data-toggle],[data-reopen],[data-copy],[data-reveal],[data-open]," +
+    "[data-edit],[data-rename],[data-del],[data-restore],[data-purge],[data-lib],[data-lib-root],[data-proj-tasks]," +
+    "[data-auto-rename],[data-auto-toggle],[data-auto-del],[data-auto-restore]");
+  if (!el) return;
+
+  const d = el.dataset;
+  const stop = () => { e.stopPropagation(); };
+
+  if (d.toggle !== undefined) {
+    stop();
+    const id = d.toggle;
+    if (openSet.has(id)) openSet.delete(id); else openSet.add(id);
+    // 不用类名切换，直接重画 —— 表格形态下展开会插入一整行 <tr>，
+    // 只切 class 是画不出来的。
+    renderList();
+    return;
+  }
+  // 行内改标题：点「标题（手动）」单元格或铅笔按钮都走这里
+  if (d.edit !== undefined) {
+    stop();
+    const td = el.closest("td");
+    if (td) startInlineEdit(td);
+    else doRename(d.edit);   // 兜底：不是在单元格里（理论上不会发生）
+    return;
+  }
+  if (d.reopen !== undefined) { stop(); openTask(d.reopen, el.textContent); return; }
+  if (d.copy !== undefined) { stop(); copy(d.copy); return; }
+  if (d.reveal !== undefined) { stop(); revealPath(d.reveal); return; }
+  if (d.open !== undefined) { stop(); if (d.open) openPath(d.open); else toast("该产物没有本地路径"); return; }
+  if (d.rename !== undefined) { stop(); doRename(d.rename); return; }
+  if (d.del !== undefined) { stop(); doDelete(d.del); return; }
+  if (d.restore !== undefined) { stop(); doRestore(d.restore); return; }
+  if (d.purge !== undefined) { stop(); doPurge(d.purge); return; }
+  if (d.libRoot !== undefined) { stop(); state.libPath = ""; state.q = ""; window.__LIB_CACHE__ = null; render(); return; }
+  if (d.lib !== undefined) {
+    stop();
+    state.libPath = d.lib; state.q = "";
+    window.__LIB_CACHE__ = null;
+    render();
+    return;
+  }
+  if (d.projTasks !== undefined) {
+    stop();
+    state.view = "tasks"; state.q = d.projTasks; state.quick = "";
+    render();
+    return;
+  }
+  if (d.autoRename !== undefined) { stop(); doAutoRename(d.autoRename); return; }
+  if (d.autoToggle !== undefined) { stop(); doAutoToggle(d.autoToggle); return; }
+  if (d.autoDel !== undefined) { stop(); doAutoDelete(d.autoDel); return; }
+  if (d.autoRestore !== undefined) { stop(); doAutoRestore(d.autoRestore); return; }
+});
+
+/* 刷新 */
+function refreshData() {
+  if (!SERVER) { showStaticHint(); return; }
+  toast("正在重新采集…");
+  fetch("/api/refresh", { method: "POST" }).then(r => r.json()).then(j => {
+    if (j.ok && j.data) { applyData(j.data); toast("已更新", "ok"); }
+    else toast("刷新失败：" + (j.error || "未知"), "err");
+  }).catch(() => toast("本地服务未响应，请确认窗口还开着", "err"));
+}
+function applyData(d) {
+  DATA.stats = d.stats;
+  DATA.tasks = d.tasks;
+  DATA.projects = d.projects;
+  DATA.automations = d.automations;
+  DATA.library_roots = d.library_roots;
+  DATA.generated_at = d.generated_at;
+  if (state.libPath) { window.__LIB_CACHE__ = null; }
+  // 刷新数据后走 render()：数据换了，工具条里的选项/值与结果条数都可能要跟着变。
+  // （打字路径不走这里，走 renderList()，所以不会打断输入。）
+  render();
+}
+function showStaticHint() {
+  const dir = decodeURIComponent(location.href.replace(/\/[^/]*$/, "")).replace(/^\//, "").replace(/\//g, "\\");
+  dialog("当前是静态页面", [
+    "这份数据是生成页面那一刻的快照。",
+    "要拿到最新数据、要改名 / 删除，请用这个文件启动：",
+    '<span class="hl">启动管理中心.bat</span>',
+    "<p style='margin:8px 0 0;color:var(--text-3);font-size:12.5px'>它就在这个目录里：</p>",
+    '<span class="path" data-copy="' + esc(dir) + '">' + esc(dir) + "</span>"
+  ].join("\n"), [{ label: "知道了" }]);
+}
+$("#btn-reload").addEventListener("click", refreshData);
+$("#btn-about").addEventListener("click", () => {
+  dialog("使用说明", [
+    "<p><b>左侧菜单</b>是各个模块，点一下就能切换：</p>",
+    "<ul>",
+    "<li><b>总览</b> — 数据全景，所有数字卡片都能点，点了就筛选</li>",
+    "<li><b>任务</b> — 所有会话任务，可以改名、删除、重新打开</li>",
+    "<li><b>项目</b> — 你用过的工作目录，以及各自的占用情况</li>",
+    "<li><b>定时任务</b> — 周期任务，可以暂停、启用、改名、删除</li>",
+    "<li><b>资料库</b> — 常用资料目录的文件浏览</li>",
+    "<li><b>回收站</b> — 删掉的东西都在这儿，可以恢复</li>",
+    "<li><b>设置与日志</b> — 备份、操作记录、数据来源</li>",
+    "</ul>",
+    "<p><b>常见操作：</b></p>",
+    "<ul>",
+    "<li>点任务名 → 唤起 WorkBuddy 打开这个任务</li>",
+    "<li>点「标题（手动）」那一格 → 直接就地改名，回车保存、Esc 取消</li>",
+    "<li>点表头（任务名 / 创建时间 / 最近更新 / 标题）→ 按该列排序</li>",
+    "<li>点「详情」→ 展开看产物、清单、用量；再点一次收起</li>",
+    "<li>想看原来的卡片样式 → 勾上工具条里的「卡片视图」</li>",
+    "<li>搜索框是按菜单各记一份的：切走再切回来，你之前的搜索词还在</li>",
+    "</ul>",
+    "<p style='color:var(--warn)'><b>安全：</b>所有改动前都会自动备份数据库，最多留 8 份。删除的任务进回收站，可以恢复。</p>"
+  ].join("\n"), [{ label: "知道了" }]);
+});
+
+/* 深链：#view=tasks&quick=no-art&q=xxx */
+//
+// quick 的**合法值**就这几个（和筛选区按钮、统计卡片一一对应）：
+//   no-art 无人问津 / stale 30天未动 / recent 近7天活跃 / lost 产物丢失
+//
+// 为什么要做别名归一：
+// 界面文案是「无人问津」，内部值是 no-art，两者对不上。任何人（包括我自己）
+// 手写深链时很容易照文案猜成 no-ask，结果 state.quick 拿到一个没人认识的字符串 ——
+// 筛选标签会亮起来，却因为没有分支匹配而**一条都不过滤**，用户看到的是
+// 「筛选状态是开着的，但列表没变」，属于最难排查的那种静默失效。
+// 现在把常见猜法都收敛到规范值，猜错了也只是不筛选（并且会提示），不会半生效。
+const QUICK_ALIAS = {
+  "no-art": "no-art", "noart": "no-art", "no_art": "no-art",
+  "no-ask": "no-art", "noask": "no-art",      // 「无人问津」的常见误拼
+  "unused": "no-art", "无人问津": "no-art",
+  "stale": "stale", "stale30": "stale", "30天未动": "stale",
+  "recent": "recent", "active": "recent", "近7天活跃": "recent",
+  "lost": "lost", "missing": "lost", "产物丢失": "lost",
+};
+
+function normalizeQuick(v) {
+  if (!v) return "";
+  const k = String(v).trim().toLowerCase();
+  return QUICK_ALIAS[k] || "";
+}
+
+function applyHash() {
+  const h = location.hash.replace(/^#/, "");
+  if (!h) return;
+  const p = new URLSearchParams(h);
+  if (p.get("view")) state.view = p.get("view");
+
+  const rawQuick = p.get("quick");
+  if (rawQuick) {
+    const q = normalizeQuick(rawQuick);
+    if (q) {
+      state.quick = q;
+    } else {
+      // 认不出来就明确说不认识，而不是留一个半生效的筛选状态
+      state.quick = "";
+      setTimeout(() => toast("不认识的筛选条件「" + rawQuick +
+        "」，已忽略。可用：无人问津 / 30天未动 / 近7天活跃 / 产物丢失"), 300);
+    }
+  }
+
+  if (p.get("q")) state.q = p.get("q");
+  if (p.get("lib")) state.libPath = p.get("lib");
+}
+
+/* 启动 */
+renderChrome();
+applyHash();
+render();
+window.addEventListener("hashchange", () => { applyHash(); render(); });
+// 快捷键 / 聚焦搜索
+document.addEventListener("keydown", e => {
+  if (e.key === "/" && document.activeElement.tagName !== "INPUT") {
+    const q = $("#q");
+    if (q) { e.preventDefault(); q.focus(); }
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,52 @@
+{
+  "_说明": "WorkBuddy 管理中心的配置。改完保存，刷新页面即生效。",
+  "_workbuddy_dir": "WorkBuddy 的数据目录，正常不用改",
+  "workbuddy_dir": "C:\\Users\\liuyuming\\.workbuddy",
+  "_library_roots": "资料库面板里要浏览的目录，可增删。name 是显示名",
+  "library_roots": [
+    {
+      "name": "WorkBuddy 数据",
+      "path": "C:\\Users\\liuyuming\\.workbuddy",
+      "desc": "技能、方案、任务数据"
+    },
+    {
+      "name": "技能目录",
+      "path": "C:\\Users\\liuyuming\\.workbuddy\\skills",
+      "desc": "已安装的技能"
+    },
+    {
+      "name": "本工具所在目录",
+      "path": "C:\\Users\\liuyuming\\.workbuddy\\skills\\ym-wb-manager",
+      "desc": "管理中心自身"
+    },
+    {
+      "name": "代码目录",
+      "path": "D:\\liuyuming\\GitProject",
+      "desc": "代码仓库"
+    },
+    {
+      "name": "代码目录",
+      "path": "D:\\Test\\src",
+      "desc": "代码仓库"
+    },
+    {
+      "name": "桌面",
+      "path": "C:\\Users\\liuyuming\\Desktop",
+      "desc": "桌面目录"
+    },
+    {
+      "name": "文档",
+      "path": "C:\\Users\\liuyuming\\Documents",
+      "desc": "文档目录"
+    },
+    {
+      "name": "下载",
+      "path": "C:\\Users\\liuyuming\\Downloads",
+      "desc": "下载目录"
+    }
+  ],
+  "_port": "服务端口，被占用时会自动往后找",
+  "port": 8777,
+  "_keep_backups": "写操作自动备份的保留份数",
+  "keep_backups": 8
+}
