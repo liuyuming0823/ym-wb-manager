@@ -33,6 +33,7 @@ SkillHub 只接受纯文本扩展名（.md/.py/.json/...），.bat 与 .vbs 会�
 """
 import argparse
 import os
+import re
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -392,10 +393,31 @@ LAUNCHERS = {
 }
 
 
+def scripts_dir_name():
+    """启动器里该用哪个目录名去找 .py 脚本。
+
+    模板正文写的是 `scripts\\`（技能包里的名字），但**开发目录里这个
+    目录叫 `tools\\`** —— 早前生成器无条件套用 `scripts\\`，于是在开发
+    目录生成的启动器全都指向一个不存在的路径，双击直接弹
+    「Cannot find: ...\\scripts\\serve.py」。
+
+    所以这里按**生成器自己所在目录的名字**来定，两个位置都能跑：
+    技能包里是 `scripts`，开发目录里是 `tools`。取不到就退回 `scripts`
+    （技能包的规范名），保持对外分发的那份不变。
+    """
+    name = os.path.basename(HERE.rstrip("\\/"))
+    return name or "scripts"
+
+
 def build(name):
     """取出某个启动器的最终内容（已填好公共片段）。"""
     body, enc, no_py = LAUNCHERS[name]
     body = body.replace("__PY_BOOT__", _PY_BOOT).replace("__NO_PY__", no_py)
+    # 把模板里写死的 scripts\ 换成真实目录名。放在最后一步做，
+    # 保证技能包（scripts\）的生成结果与既有文件逐字节一致。
+    sd = scripts_dir_name()
+    if sd != "scripts":
+        body = body.replace("scripts\\", sd + "\\")
     return body, enc
 
 
@@ -421,9 +443,21 @@ def write_all(force=False):
     return made, skipped
 
 
+def referenced_scripts(name):
+    """从启动器内容里抠出它引用的 .py 文件名。
+
+    不做通用解析，只认 `xxx.py` 这种尾巴 —— 启动器里引用的脚本
+    只有 findpy / serve / scan / killer / config / alive 这几个，
+    用正则足够，也更不容易被无关文本误伤。
+    """
+    body, _enc = build(name)
+    return sorted(set(re.findall(r"([A-Za-z_][A-Za-z0-9_]*\.py)", body)))
+
+
 def check():
-    """检查已有启动器的编码与行尾是否合规。返回不合规的条数。"""
+    """检查已有启动器的编码 / 行尾 / 引用路径是否合规。返回不合规的条数。"""
     bad = 0
+    sd = scripts_dir_name()
     for name in LAUNCHERS:
         path = os.path.join(ROOT, name)
         if not os.path.exists(path):
@@ -444,6 +478,14 @@ def check():
                 raw.decode("gbk")
             except UnicodeDecodeError:
                 problems.append("不是合法 GBK")
+
+        # 🔴 引用的脚本必须真的存在于当前目录布局下。
+        # 这一条是为了拦住「模板写死 scripts\ 但本机目录叫 tools\」那类
+        # 静默错配 —— 启动器能生成、看着没问题，双击才弹「Cannot find」。
+        for fn in referenced_scripts(name):
+            if not os.path.exists(os.path.join(HERE, fn)):
+                problems.append("引用了不存在的脚本 %s\\%s" % (sd, fn))
+
         if problems:
             print("  [不合规] %s -> %s" % (name, "；".join(problems)))
             bad += 1

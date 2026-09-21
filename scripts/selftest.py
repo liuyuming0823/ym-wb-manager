@@ -935,6 +935,34 @@ def t_packaging():
     check("发布合规：生成器幂等（已存在则跳过，不覆盖用户改动）",
           "已存在" in ml and "force" in ml)
 
+    # 🔴 启动器里的脚本目录名必须跟着实际目录走。
+    # 事故：模板正文写死 `scripts\`，而开发目录叫 `tools\` —— 在开发目录
+    # 生成的启动器全部指向不存在的路径，生成时毫无报错，**双击才弹**
+    # 「Cannot find: ...\scripts\serve.py」。属于最难自查的静默错配。
+    check("发布合规：脚本目录名按实际目录推导（不写死 scripts）",
+          "scripts_dir_name" in ml and "basename(HERE" in ml)
+    check("发布合规：生成后校验引用的脚本真实存在",
+          "referenced_scripts" in ml and "引用了不存在的脚本" in ml)
+
+    # 落到实物上验：当前目录下生成的启动器，引用的 .py 都得找得到。
+    try:
+        if HERE not in sys.path:
+            sys.path.insert(0, HERE)
+        import make_launchers as _mk
+        missing = []
+        for _name in ("启动管理中心.bat", "停止管理中心.bat",
+                      "刷新数据.bat", "启动管理中心.vbs"):
+            _p = os.path.join(_mk.ROOT, _name)
+            if not os.path.exists(_p):
+                continue          # 技能包未生成属正常，跳过
+            for _fn in _mk.referenced_scripts(_name):
+                if not os.path.exists(os.path.join(_mk.HERE, _fn)):
+                    missing.append("%s -> %s" % (_name, _fn))
+        check("发布合规：已生成的启动器指向的脚本全部存在", not missing,
+              "缺失：%s" % "、".join(missing) if missing else "全部命中")
+    except Exception as _e:       # noqa: BLE001
+        check("发布合规：已生成的启动器指向的脚本全部存在", False, "检查出错：%s" % _e)
+
 
 def main():
     ap = argparse.ArgumentParser(description="管理中心自检")
