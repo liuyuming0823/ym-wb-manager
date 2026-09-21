@@ -9,7 +9,7 @@ description_zh: "本地网页面板：集中查看和管理 WorkBuddy 的任务�
 description_en: "A local web dashboard to browse and manage WorkBuddy tasks, artifacts, projects and automations"
 summary: "本地网页面板：集中查看和管理 WorkBuddy 的任务、产物、项目、定时任务与资料库"
 category: dev-programming
-version: 1.0.1
+version: 1.0.2
 author: 刘玉明
 tags: [WorkBuddy管理中心, 任务管理, 产物管理, 定时任务, 资料库]
 trigger:
