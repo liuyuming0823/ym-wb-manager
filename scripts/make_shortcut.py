@@ -67,14 +67,57 @@ def make_link(lnk_path, name, target, args, workdir, icon, desc):
     with open(tmp, "w", encoding="gbk", errors="replace") as fh:
         fh.write(vbs)
     try:
-        out = subprocess.run(["cscript", "//nologo", tmp],
-                             capture_output=True, timeout=25)
-        return out.returncode == 0, out.stderr.decode("gbk", errors="replace")
+        cmd = ["cscript", "//nologo", tmp]
+        out = subprocess.run(cmd, capture_output=True, timeout=25)
+        if out.returncode == 0 and os.path.exists(lnk_path):
+            return True, ""
+        # cscript 落空（被安全策略拦、被裁掉）时再试 wscript —— 两者
+        # 用的是同一个脚本引擎，换一个宿主往往就能过。
+        out2 = subprocess.run(["wscript", "//nologo", tmp],
+                              capture_output=True, timeout=25)
+        if out2.returncode == 0 and os.path.exists(lnk_path):
+            return True, ""
+        err = (out.stderr or b"") + (out2.stderr or b"")
+        return False, err.decode("gbk", errors="replace")
+    except Exception as exc:              # noqa: BLE001
+        return False, str(exc)
     finally:
         try:
             os.remove(tmp)
         except OSError:
             pass
+
+
+def main_quiet(name=DEFAULT_NAME, start_menu=False):
+    """给程序内部调用的入口：不解析命令行、不打印。
+
+    返回 0 表示快捷方式已经存在（不管是刚建的还是本来就有）。
+    创建失败返回 1 —— 调用方可以据此决定要不要提示用户。
+    """
+    targets = [os.path.join(desktop_dir(), name + ".lnk")]
+    if start_menu:
+        targets.append(os.path.join(start_menu_dir(), name + ".lnk"))
+
+    if not os.path.exists(VBS):
+        return 1
+
+    # wscript.exe 的位置从环境变量推导，不写死盘符：
+    # SystemRoot / WINDIR 在 Windows 上必然存在；万一都被裁掉，
+    # 就退回裸命令名交给系统去 PATH 里找，而不是硬猜某个盘符。
+    _sysroot = os.environ.get("SystemRoot") or os.environ.get("WINDIR")
+    wscript = (os.path.join(_sysroot, "System32", "wscript.exe")
+               if _sysroot else "wscript.exe")
+    icon = wscript if os.path.exists(wscript) else "shell32.dll,21"
+
+    ok_any = False
+    for t in targets:
+        ok, _err = make_link(
+            t, name, wscript, '"%s"' % VBS, ROOT, icon,
+            "启动 WorkBuddy 管理中心（无窗口）",
+        )
+        if ok and os.path.exists(t):
+            ok_any = True
+    return 0 if ok_any else 1
 
 
 def main():
@@ -107,24 +150,13 @@ def main():
         print("  找不到启动器：%s" % VBS, file=sys.stderr)
         return 1
 
-    # wscript.exe 的位置从环境变量推导，不写死盘符：
-    # SystemRoot / WINDIR 在 Windows 上必然存在；万一都被裁掉，
-    # 就退回裸命令名交给系统去 PATH 里找，而不是硬猜某个盘符。
-    _sysroot = os.environ.get("SystemRoot") or os.environ.get("WINDIR")
-    wscript = (os.path.join(_sysroot, "System32", "wscript.exe")
-               if _sysroot else "wscript.exe")
-    icon = wscript if os.path.exists(wscript) else "shell32.dll,21"
-
+    rc = main_quiet(name=args.name, start_menu=args.start_menu)
     for t in targets:
-        ok, err = make_link(
-            t, args.name, wscript, '"%s"' % VBS, ROOT, icon,
-            "启动 WorkBuddy 管理中心（无窗口）",
-        )
-        if ok and os.path.exists(t):
+        if os.path.exists(t):
             print("  已创建：%s" % t)
         else:
-            print("  创建失败：%s  %s" % (t, err.strip()))
-    return 0
+            print("  创建失败：%s" % t)
+    return rc
 
 
 if __name__ == "__main__":

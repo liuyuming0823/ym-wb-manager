@@ -301,7 +301,32 @@ def main():
         print("  一切正常，可以用了。")
     print()
     print("  配置文件：%s" % rep["config_path"])
-    print()
+
+    # 体检通过之后，一定要明确告诉用户「下一步做什么」。
+    # 这是凭空多出来的一步：体检结果本身只说明环境没问题，
+    # 而用户拿到一堆 .py 文件时最想问的就是「那我怎么打开它」。
+    # 只有环境真的能跑时才引导，否则等于在坏地基上教人进门。
+    if not s["bad"]:
+        has_icon = False
+        try:
+            import scan as _scan
+            # quiet：体检输出里不该混进「跳过（已存在）」这种噪声，
+            # 用户要看的是「接下来怎么打开」。
+            _scan._ensure_launchers(quiet=True)
+            has_icon = _scan._ensure_shortcut(quiet=True)
+        except Exception:                 # noqa: BLE001 - 引导失败不影响体检结论
+            pass
+        print()
+        print("  下一步 —— 打开管理中心：")
+        print()
+        if has_icon:
+            print("    桌面双击「WorkBuddy 管理中心」图标")
+            print("    （图标不好找的话，双击目录里的 启动管理中心.vbs）")
+        else:
+            print("    双击目录里的 启动管理中心.vbs")
+        print()
+        print("  第一次用建议先看一眼：说明.md")
+        print()
     return 1 if s["bad"] else 0
 
 

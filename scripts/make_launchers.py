@@ -421,13 +421,19 @@ def build(name):
     return body, enc
 
 
-def write_all(force=False):
-    """在技能根目录写出全部启动器。返回 (新建, 跳过) 两个计数。"""
+def write_all(force=False, quiet=False):
+    """在技能根目录写出全部启动器。返回 (新建, 跳过) 两个计数。
+
+    quiet=True 时一句都不打印 —— 给「顺手补一下」的调用方用
+    （比如 doctor.py 的收尾引导）。那种场合用户关心的是
+    「我接下来怎么打开」，不是「哪个文件被跳过了」。
+    """
     made = skipped = 0
     for name in LAUNCHERS:
         path = os.path.join(ROOT, name)
         if os.path.exists(path) and not force:
-            print("  跳过（已存在）：%s" % name)
+            if not quiet:
+                print("  跳过（已存在）：%s" % name)
             skipped += 1
             continue
         body, enc = build(name)
@@ -438,7 +444,8 @@ def write_all(force=False):
         with open(tmp, "wb") as fh:
             fh.write(data)
         os.replace(tmp, path)
-        print("  已生成：%s（%s / %d 字节）" % (name, enc.upper(), len(data)))
+        if not quiet:
+            print("  已生成：%s（%s / %d 字节）" % (name, enc.upper(), len(data)))
         made += 1
     return made, skipped
 

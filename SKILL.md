@@ -48,13 +48,21 @@ WorkBuddy 用久了会有几百个任务散在会话记录里，想找「上周�
 终点是**用户双击就能打开一个网页面板**，不是一堆脚本。
 
 1. `scripts/doctor.py` 跑通（11 项无 bad）—— 这一步顺便会生成配置
-2. 用户能双击 `启动管理中心.bat`（静默启动用 `启动管理中心.vbs`）看到页面
-3. 页面能读到他自己的任务数据
+2. **桌面出现「WorkBuddy 管理中心」图标**（首次运行自动创建）
+3. 用户双击桌面图标（或目录里的 `启动管理中心.vbs`）看到页面
+4. 页面能读到他自己的任务数据
+
+> **为什么要在桌面放图标**：用户拿到技能后不知道要去哪个目录、双击哪个文件。
+> 与其在文档里写「请手动双击 XXX」，不如直接把图标放到他每天都会看到的地方。
+> 由 `scan.py` 的 `_ensure_shortcut()` 完成，**只建一次**（已有同名 `.lnk` 就跳过，
+> 不覆盖用户自己改过的图标 / 名字）。不想要桌面图标时设 `WB_NO_SHORTCUT=1`。
 
 > **双击启动器从哪来**：技能包里**不含** `.bat` / `.vbs`（技能平台只收纯文本扩展名，
 > 带上它们会整单拒收）。改为由 `scripts/make_launchers.py` 在**首次运行时现场生成**——
 > 跑一次 `doctor.py` 或 `scan.py` 就会自动补齐，生成结果与手工放进去的完全一致。
 > 也可以单独生成：`python scripts/make_launchers.py`（`--force` 覆盖，`--check` 只检查编码与行尾）。
+> 快捷方式同理：`python scripts/make_shortcut.py` 手动建，`--remove` 删除，
+> `--start-menu` 顺便放进开始菜单。
 
 ## 执行步骤
 
@@ -240,10 +248,30 @@ assets/
     会 `command not found` —— 更危险的是写成 `grep ... || echo "(无)"` 时
     兜底照样输出，**检查根本没跑却看着像通过了**。
 
+11. **🔴 「静音」不等于「跳过准备入口」。**
+    `scan.py --quiet` 原本把 `first_run_check()` 整个跳过 —— 本意是
+    「不打印引导」，实际连**桌面图标和启动器都不建了**。用户事后想双击，
+    发现压根没图标。现在 `--quiet` 分支里仍会 `_ensure_launchers(quiet=True)`
+    + `_ensure_shortcut(quiet=True)`，只是不吭声。
+    **加静音开关时，先分清「别说话」和「别干活」。**
+
+12. **🔴 桌面快捷方式只建一次，不能每次刷新都重建。**
+    用户可能改过图标、改过名字、挪过位置。每次都覆盖等于
+    「你刚调好的东西被程序擦掉了」。`_ensure_shortcut()` 先查
+    `os.path.exists(lnk)`，有就返回。
+    另外建完要**回读确认文件真的出现了** —— `cscript` 可能返回 0 但没写成功
+    （沙箱拦截时就是这样，退出码骗人）。
+
+13. **🔴 静默生成的路径统一走 `main_quiet()`。**
+    `make_shortcut.py` 原来只有 `main()`（argparse + 打印），程序内部想调用
+    就只能再起一个进程，或者硬凑 `argparse.Namespace`。
+    → 拆出 `main_quiet()` 返回退出码、不打印；`main()` 复用它。
+    `make_launchers.write_all(quiet=True)` 同理。**给内部调用留一个口子。**
+
 ## 自检
 
 ```bash
-python scripts/selftest.py            # 全部 129 项
+python scripts/selftest.py            # 全部 189 项
 python scripts/selftest.py --quick    # 跳过要起服务的部分
 ```
 

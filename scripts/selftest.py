@@ -935,6 +935,40 @@ def t_packaging():
     check("发布合规：生成器幂等（已存在则跳过，不覆盖用户改动）",
           "已存在" in ml and "force" in ml)
 
+    # ---- 桌面快捷方式：装完就该有图标，不能靠用户自己找目录 ----
+    ms = ""
+    for p in (os.path.join(HERE, "make_shortcut.py"),
+              os.path.join(ROOT, "tools", "make_shortcut.py")):
+        if os.path.exists(p):
+            with open(p, encoding="utf-8") as fh:
+                ms = fh.read()
+            break
+    check("发布合规：快捷方式模块提供程序内入口 main_quiet()",
+          "def main_quiet" in ms)
+    check("发布合规：cscript 失手时退到 wscript（沙箱常拦 cscript）",
+          '"wscript"' in ms or "'wscript'" in ms)
+    check("发布合规：首次运行引导里会补桌面快捷方式",
+          "_ensure_shortcut" in scan)
+    check("发布合规：快捷方式只建一次（已有则不动用户改过的图标）",
+          "os.path.exists(lnk)" in scan and "不打扰" in scan)
+    check("发布合规：快捷方式失败不阻断（生成失败只提示）",
+          "创建桌面快捷方式失败" in scan)
+    check("发布合规：可用 WB_NO_SHORTCUT 关掉桌面图标",
+          "WB_NO_SHORTCUT" in scan)
+    # 这个坑很隐蔽：--quiet 曾把「建图标」一起跳过，
+    # 于是自动化里跑过 --quiet 的机器永远没有桌面图标。
+    check("发布合规：--quiet 只静音、仍会准备桌面图标",
+          "_ensure_shortcut(quiet=True)" in scan)
+    doc = ""
+    for p in (os.path.join(HERE, "doctor.py"),
+              os.path.join(ROOT, "tools", "doctor.py")):
+        if os.path.exists(p):
+            with open(p, encoding="utf-8") as fh:
+                doc = fh.read()
+            break
+    check("发布合规：体检通过后明确告诉用户下一步怎么打开",
+          "下一步" in doc and "打开管理中心" in doc)
+
     # 🔴 启动器里的脚本目录名必须跟着实际目录走。
     # 事故：模板正文写死 `scripts\`，而开发目录叫 `tools\` —— 在开发目录
     # 生成的启动器全部指向不存在的路径，生成时毫无报错，**双击才弹**

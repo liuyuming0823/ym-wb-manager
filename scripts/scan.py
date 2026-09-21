@@ -35,23 +35,25 @@ def collect():
     return datalayer.snapshot()
 
 
-def _ensure_launchers():
+def _ensure_launchers(quiet=False):
     """首次运行时补齐双击启动器（幂等，已存在就不动）。
 
     做成「静默、失败不阻断」：生成启动器只是锦上添花，
     它自己出问题不该让整个采集流程挂掉 —— 用户依然可以直接跑
     `python serve.py` 启动。
+
+    quiet=True 用于「只想补齐、不想刷屏」的场合（doctor 收尾时）。
     """
     try:
         import make_launchers as mk
     except ImportError:
         return
     try:
-        made, _skipped = mk.write_all(force=False)
+        made, _skipped = mk.write_all(force=False, quiet=quiet)
     except Exception as exc:          # noqa: BLE001 - 任何异常都不该阻断采集
         print("  [提示] 启动器生成失败（不影响使用）：%s" % exc)
         return
-    if made:
+    if made and not quiet:
         print()
         print("  已生成 %d 个双击启动器，下次可以直接用：" % made)
         print("    启动管理中心.bat   有窗口，看得见日志（排查问题用）")
@@ -59,6 +61,57 @@ def _ensure_launchers():
         print("    停止管理中心.bat   停掉正在运行的服务")
         print("    刷新数据.bat       重新采集数据并生成静态页")
         print()
+
+
+def _ensure_shortcut(quiet=False):
+    """首次运行时在桌面放一个快捷方式（幂等）。
+
+    为什么要有这一步：技能最顺手的用法是「双击桌面图标」，但用户拿到
+    技能后根本不知道有这回事 —— 他不知道要去哪个目录、双击哪个文件。
+    与其在文档里写「请手动双击 启动管理中心.vbs」，不如直接把图标
+    放到他每天都会看到的地方。
+
+    **只建一次**：桌面已有同名 .lnk 就跳过。否则用户自己改过图标 / 名字，
+    下次刷新数据又被覆盖回去，属于「越俎代庖」。
+
+    同样做成「静默、失败不阻断」：建快捷方式失败（比如沙箱拦了
+    cscript、桌面被 OneDrive 重定向到奇怪的位置）不该影响数据采集。
+
+    返回 True 表示「桌面上现在有图标了」（不管刚建的还是本来就有）。
+    quiet=True 时不打印。
+    """
+    try:
+        import make_shortcut as ms
+    except ImportError:
+        return False
+
+    try:
+        lnk = os.path.join(ms.desktop_dir(), ms.DEFAULT_NAME + ".lnk")
+    except Exception:                     # noqa: BLE001
+        return False
+
+    if os.path.exists(lnk):
+        return True                       # 已经有了，不打扰
+
+    # 图标指向的 vbs 得先存在，否则快捷方式双击也是报错。
+    if not os.path.exists(ms.VBS):
+        return False
+
+    try:
+        rc = ms.main_quiet()
+    except Exception as exc:              # noqa: BLE001
+        if not quiet:
+            print("  [提示] 创建桌面快捷方式失败（不影响使用）：%s" % exc)
+        return False
+
+    if rc == 0 and os.path.exists(lnk):
+        if not quiet:
+            print()
+            print("  已在桌面创建快捷方式：「%s」" % ms.DEFAULT_NAME)
+            print("  以后直接双击桌面图标就能打开管理中心。")
+            print()
+        return True
+    return False
 
 
 def first_run_check():
@@ -89,6 +142,12 @@ def first_run_check():
     # （make_launchers.py，纯 .py 可发布），首次运行时现场写出来。
     # 已经有了就跳过，不会覆盖你自己改过的启动器。
     _ensure_launchers()
+
+    # 再把图标放到桌面 —— 用户不知道要去哪个目录双击哪个文件，
+    # 但一定看得见桌面。同样幂等：桌面已有就不动。
+    # 想跳过用 WB_NO_SHORTCUT=1（比如服务器上批量跑，不想要桌面图标）。
+    if not os.environ.get("WB_NO_SHORTCUT"):
+        _ensure_shortcut()
 
     wb = cfg["workbuddy_dir"]
     if not os.path.isdir(wb):
@@ -158,6 +217,14 @@ def main():
 
     if not args.quiet:
         first_run_check()
+    else:
+        # --quiet 只是「别打印引导」，不代表「别准备入口」。
+        # 早前把两者绑在一起，导致自动化里跑 --quiet 时桌面图标
+        # 永远建不出来 —— 用户事后想双击却发现压根没图标。
+        # 这里仍补齐启动器与快捷方式，只是不吭声。
+        _ensure_launchers(quiet=True)
+        if not os.environ.get("WB_NO_SHORTCUT"):
+            _ensure_shortcut(quiet=True)
 
     payload = collect()
     if args.json_out:
