@@ -24,6 +24,12 @@ WorkBuddy 管理中心 · 本地服务
   POST /api/auto-restore    恢复定时任务      {id}
   POST /api/backup          立即备份数据库
   GET  /api/log?limit=      操作日志
+  GET  /api/online/search?q= 搜线上技能（SkillHub，免登录）
+  GET  /api/online/skill?slug= 线上技能详情
+  POST /api/online/install  安装线上技能  {slug, namespace, overwrite}
+  GET  /api/account         账户、积分、记忆与版本信息
+  GET  /api/memory?path=    读一个记忆文件
+  POST /api/check-update    检查更新（客户端 + 本机技能）
 
 安全约束（重要）：
   - 只绑定 127.0.0.1，不对外网开放
@@ -56,6 +62,7 @@ import config as conf         # noqa: E402
 import data as datalayer     # noqa: E402
 import ops                   # noqa: E402
 import console               # noqa: E402
+import online                # noqa: E402
 
 TEMPLATE = os.path.join(ROOT, "assets", "template.html")
 WB_DIR = conf.wb_dir()
@@ -204,6 +211,45 @@ def do_reveal(path):
         return True, None
     except OSError as exc:
         return False, str(exc)
+
+
+def _memory_path_allowed(path):
+    """记忆文件读取的路径闸门。
+
+    只允许读这几个目录下的 .md / .json：
+      · ~/.workbuddy/memory/          —— 云端记忆缓存
+      · ~/.workbuddy/MEMORY.md 等文件  —— 用户级长期记忆
+      · 配置里各项目 memory 目录       —— 项目记忆
+    除此之外一律拒绝 —— 否则这个接口就是个任意文件读取漏洞。
+    """
+    if not path:
+        return False, "路径为空"
+    if ".." in path.replace("/", "\\").split("\\"):
+        return False, "路径包含 .."
+    try:
+        ap = os.path.abspath(path)
+    except Exception:                      # noqa: BLE001
+        return False, "路径非法"
+    if not os.path.isfile(ap):
+        return False, "文件不存在"
+    if os.path.splitext(ap)[1].lower() not in (".md", ".txt", ".json"):
+        return False, "只允许读取 .md / .txt / .json"
+    n = norm(ap)
+    roots = set()
+    for d in datalayer.memory_dirs():
+        try:
+            roots.add(norm(d))
+        except Exception:                  # noqa: BLE001
+            pass
+    for f in datalayer.memory_files():
+        try:
+            roots.add(norm(f))
+        except Exception:                  # noqa: BLE001
+            pass
+    for r in roots:
+        if n == r or n.startswith(r + "\\") or r.startswith(n + "\\"):
+            return True, None
+    return False, "路径不在记忆目录范围内"
 
 
 def do_reopen(sid):
@@ -378,6 +424,62 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"ok": False, "error": str(exc)}, 500)
             return
 
+        if p == "/api/online/search":
+            # 搜线上技能。**只在用户点「搜索」时才调** —— 公网接口有 12 秒超时，
+            # 放页面加载路径上会让整个面板卡住；而且每次刷新都打一遍不礼貌。
+            try:
+                res = online.search(g("q"), limit=40)
+                # 标出哪些已经装了，省得用户重复装
+                have = set()
+                try:
+                    have = {n.lower() for n in online.installed_slugs(conf.skills_dir())}
+                except Exception:                       # noqa: BLE001
+                    pass
+                for it in res.get("results", []):
+                    it["installed"] = it["slug"].lower() in have
+                self._json(res)
+            except Exception as exc:
+                self._json({"ok": False, "error": "%s: %s" % (type(exc).__name__, exc)}, 500)
+            return
+
+        if p == "/api/online/skill":
+            try:
+                self._json(online.detail(g("slug")))
+            except Exception as exc:
+                self._json({"ok": False, "error": "%s: %s" % (type(exc).__name__, exc)}, 500)
+            return
+
+        if p == "/api/account":
+            try:
+                self._json(datalayer.account_info())
+            except Exception as exc:
+                self._json({"ok": False, "error": "%s: %s" % (type(exc).__name__, exc)}, 500)
+            return
+
+        if p == "/api/memory":
+            # 读一个记忆文件。**路径限制在本机记忆目录内** ——
+            # 不做限制等于给了一个任意文件读取接口。
+            path = g("path")
+            ok, err = _memory_path_allowed(path)
+            if not ok:
+                self._json({"ok": False, "error": err})
+                return
+            try:
+                with open(path, "r", encoding="utf-8", errors="replace") as fh:
+                    txt = fh.read(200_000)
+                self._json({"ok": True, "path": path, "text": txt,
+                            "size": os.path.getsize(path)})
+            except OSError as exc:
+                self._json({"ok": False, "error": str(exc)})
+            return
+
+        if p == "/api/check-update":
+            try:
+                self._json(datalayer.check_updates())
+            except Exception as exc:
+                self._json({"ok": False, "error": "%s: %s" % (type(exc).__name__, exc)}, 500)
+            return
+
         self._send(404, "not found", "text/plain; charset=utf-8")
 
     # -------------------------------------------------------- POST
@@ -454,6 +556,37 @@ class Handler(BaseHTTPRequestHandler):
                             "message": "备份完成"})
             except Exception as exc:
                 self._json({"ok": False, "error": str(exc)}, 500)
+            return
+
+        if p == "/api/online/install":
+            # 装线上技能。
+            #
+            # 安全取向：**不静默、不批量、不覆盖**。
+            #   · slug 必须显式给（不允许「装搜索结果第一条」这种偷懒调用）
+            #   · 覆盖要显式 overwrite=true，覆盖前旧目录改名保留
+            #   · 落位后 invalidate() 让下次刷新能看见新技能
+            try:
+                slug = (body.get("slug") or "").strip()
+                if not slug:
+                    self._json({"ok": False, "error": "缺少 slug"})
+                    return
+                res = online.install(
+                    slug,
+                    conf.skills_dir(),
+                    namespace=(body.get("namespace") or "").strip(),
+                    overwrite=bool(body.get("overwrite")),
+                )
+                if res.get("ok"):
+                    invalidate()
+                    # 记一笔操作日志 —— 装了别人的代码进本机，必须留痕
+                    try:
+                        ops.log_action("install-skill", slug,
+                                       "安装线上技能 -> %s" % (res.get("installed_dir") or ""))
+                    except Exception:               # noqa: BLE001
+                        pass
+                self._json(res)
+            except Exception as exc:
+                self._json({"ok": False, "error": "%s: %s" % (type(exc).__name__, exc)}, 500)
             return
 
         if p == "/api/config":

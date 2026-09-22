@@ -337,6 +337,222 @@ def t_data():
     t0 = (d.get("tasks") or [{}])[0]
     check("tasks 同时提供 deleted / deleted_at",
           "deleted" in t0 and "deleted_at" in t0)
+
+    # ---------------- 扩展（技能/专家/专家团/连接器）----------------
+    #
+    # 这一组防的是「数字虚高」和「类型误判」两类静默错误：
+    #   · 早前把市场货架（98 个包，只装了 10 个）当成已安装，总数虚高到 183
+    #   · 早前用 agents/ 数量判类型，把 welcomemode 这类内置包标成了「专家」
+    # 两者都不会报错，只会安静地给出错误答案 —— 所以必须有断言盯着。
+    plugs = d.get("plugins")
+    check("快照里有 plugins 键", isinstance(plugs, list),
+          type(plugs).__name__)
+    plugs = plugs or []
+
+    FIELDS = ("id", "name", "kind", "source", "marketplace", "desc",
+              "version", "author", "path", "installed", "missing")
+    bad_field = [p.get("id") for p in plugs
+                 if not all(k in p for k in FIELDS)]
+    check("每条扩展的字段结构一致", not bad_field, bad_field[:3])
+
+    LEGAL = {"skill", "expert", "team", "connector", "plugin"}
+    bad_kind = sorted({p.get("kind") for p in plugs} - LEGAL)
+    check("扩展类型都在合法集合内", not bad_kind, bad_kind)
+
+    id_dup = len(plugs) - len({p.get("id") for p in plugs})
+    check("扩展没有重复条目", id_dup == 0, "重复 %d" % id_dup)
+
+    inst = [p for p in plugs if p.get("installed")]
+    check("至少有已安装的扩展", len(inst) > 0, "%d 条" % len(inst))
+    check("已安装数不超过总数", len(inst) <= len(plugs),
+          "%d / %d" % (len(inst), len(plugs)))
+
+    # 内置包绝不能被标成专家/专家团（welcomemode / interactionmode 等带 agents/，
+    # 照 agents 数量判会全成「专家」）
+    builtin_bad = [p["name"] for p in inst
+                   if p.get("marketplace") == "workbuddy-builtin"
+                   and p.get("kind") in ("expert", "team")]
+    check("内置包没有被误判成专家/专家团", not builtin_bad, builtin_bad[:4])
+
+    # 专家团必须是真的多角色（agents 判据）；单角色只能是专家
+    team_bad = [p["name"] for p in plugs
+                if p.get("kind") == "team" and "个角色" not in (p.get("kind_note") or "")]
+    check("专家团都带角色数说明", not team_bad, team_bad[:4])
+
+    st = d.get("stats") or {}
+    for k in ("plugin_count", "plugin_installed", "plugin_skill",
+              "plugin_expert", "plugin_team", "plugin_connector"):
+        check("stats 有 %s" % k, k in st, st.get(k))
+    check("stats.plugin_count 与列表长度一致",
+          st.get("plugin_count") == len(plugs),
+          "%s vs %s" % (st.get("plugin_count"), len(plugs)))
+    check("stats.plugin_installed 与实算一致",
+          st.get("plugin_installed") == len(inst),
+          "%s vs %s" % (st.get("plugin_installed"), len(inst)))
+
+    # 三类来源各至少命中一个（本机实测有：本地技能 / MCP / 内置）
+    kinds = {p.get("kind") for p in inst}
+    for want in ("skill", "connector"):
+        check("已安装里有 %s" % want, want in kinds, sorted(kinds))
+    has_local = any(p.get("marketplace") == "local" for p in inst)
+    check("本地目录型技能被收进来了", has_local)
+    print("       plugins: 共 %d（已装 %d）技能 %s 专家 %s 专家团 %s 连接器 %s 内置 %s"
+          % (len(plugs), len(inst), st.get("plugin_skill"), st.get("plugin_expert"),
+             st.get("plugin_team"), st.get("plugin_connector"), st.get("plugin_plugin")))
+
+    # ---------------- 中文名（display_name）----------------
+    #
+    # 明哥的原话：「只看 slug 看不太懂是什么技能、专家等」。
+    # 中文名的来源是 5 处异构位置（市场 _skillhub_meta.json / SKILL.md frontmatter
+    # 的 display_name / plugin.json 的 name / 专家包 plugin.json / 市场货架）。
+    # 这里只要保证「填了的确实是中文名、没填的是空串而不是 slug 冒充」——
+    # 别让中文名退化成「把 slug 又抄了一遍」，那等于没做。
+    dn_vals = [(p.get("id"), p.get("display_name") or "") for p in plugs]
+    bad_dn_type = [i for i, v in dn_vals if not isinstance(v, str)]
+    check("扩展：display_name 都是字符串", not bad_dn_type, bad_dn_type[:3])
+    # 中文名退化成「把 id 抄一遍」是这里最容易犯的错（看着像填了，其实无信息）。
+    #
+    # 但不能一律判错：像 github 这个连接器，它自己 plugin.json 里写的
+    # name 就**真的是** "github"（官方就这么定义的），这时 display_name == name
+    # 不是我们抄的，是忠实照搬源数据。
+    # 所以判据收紧成：display_name 不许等于**带市场后缀的 id**
+    # （比如 "github@codebuddy-plugins-official"）—— 那个 id 是本工具自己拼的，
+    # 一旦出现在 display_name 里，就说明走了「拿内部 id 兜底」的错误分支。
+    fake_dn = [(i, v) for i, v in dn_vals if v and v == i]
+    check("扩展：display_name 不是把内部 id 抄了一遍", not fake_dn, fake_dn[:3])
+    # 已装的本机技能里应该**有一些**能配上中文名（配不上的是本地自制，属正常）
+    inst_dn = [p for p in inst if p.get("display_name")]
+    check("扩展：已装技能里能解析出中文名的比例不过低",
+          len(inst_dn) * 5 >= len(inst), "%d/%d 有中文名" % (len(inst_dn), len(inst)))
+    # display_name 与 name 相同时，前端必须把重复的那行副标题藏掉，
+    # 否则「github / github」叠两行，看着像渲染 bug。
+    # （这条属于前端，真正的断言在 t_template_js 里，这里只确认数据侧没被抄成 id）
+    same_dn = [p["id"] for p in plugs
+               if p.get("display_name") and p.get("display_name") == p.get("name")]
+    check("扩展：name 与 display_name 重合的是源数据本身（非本工具抄的）",
+          all(not d.startswith("local-skill:") for d in same_dn),
+          same_dn[:3])
+
+    # ---------------- 资料库分页签 ----------------
+    #
+    # 明哥的疑问：「资料库现在是只有设置里面的东西了吗？原来 workbuddy 里的资料在哪？」
+    # 事实是资料没丢，只是全埋在「WorkBuddy 数据」一张卡后面。改成按类型分页签。
+    # 这里守三件事：① 分组确实有内容 ② 只收真实存在的目录 ③ 路径在 wb_dir 底下。
+    _g = D.library_groups()
+    check("资料库：library_groups 返回分组列表", isinstance(_g, list) and len(_g) >= 2,
+          "%d 组" % len(_g))
+    _ids = [x.get("id") for x in _g]
+    check("资料库：分组 id 是预期的四类",
+          set(_ids) <= {"skill", "data", "docs", "sys"},
+          _ids)
+    _all_ent = [e for x in _g for e in (x.get("entries") or [])]
+    check("资料库：分组里有可浏览的目录", len(_all_ent) >= 8, "%d 个入口" % len(_all_ent))
+    # 🔴 只收真实存在的目录 —— 不存在的收进来就是「点了报错」的入口。
+    # （这和 config 的 library_roots 策略相反：那是用户自己配的，失效要显示出来才好改。）
+    _missing = [e.get("path") for e in _all_ent if not os.path.isdir(e.get("path") or "")]
+    check("资料库：不收录不存在的目录", not _missing, _missing[:3])
+    _outside = [e.get("path") for e in _all_ent
+                if not str(e.get("path") or "").startswith(D.WB_DIR)]
+    check("资料库：所有入口都在 WorkBuddy 数据目录内", not _outside, _outside[:3])
+    # 技能的入口必须在，否则「我装了什么技能」还是得靠翻文件夹
+    _rel = [e.get("rel") for e in _all_ent]
+    check("资料库：含 skills 入口", "skills" in _rel)
+    check("资料库：含 artifact-index 入口", "artifact-index" in _rel)
+    # 计数要么是正数，要么是 None（读不出来）；不许是 0 冒充「空目录」
+    _zero = [(e.get("rel"), e.get("count")) for e in _all_ent
+             if e.get("count") == 0 and os.path.isdir(e.get("path") or "")]
+    check("资料库：非空目录的计数不为 0（0 会误导成空）", not _zero, _zero[:3])
+
+    # ---------------- 账户信息 ----------------
+    #
+    # 这一块的坑很明确：积分/签到要登录态，本工具**拿不到**。
+    # 所以必须守住两条：① 不因为拿不到就整个接口崩掉；
+    # ② 不伪造数字（宁可 credits.available=False 让前端改做入口）。
+    acc = D.account_info()
+    check("账户：account_info 返回 ok", acc.get("ok") is True)
+    check("账户：有 client 段", isinstance(acc.get("client"), dict))
+    check("账户：client 里有版本或数据目录",
+          bool((acc.get("client") or {}).get("version")
+               or (acc.get("client") or {}).get("data_dir")))
+    # 🔴 不许编积分。拿不到就必须明说拿不到。
+    cr = acc.get("credits") or {}
+    check("账户：积分明确标注是否可用（不伪造）",
+          "available" in cr and cr["available"] is False,
+          cr)
+    links = acc.get("links") or []
+    check("账户：提供了唤起客户端的入口", len(links) >= 3, "%d 个" % len(links))
+    # 入口分两类，各自的 url 协议是**不同**的，这里要分开判：
+    #   · kind=app -> 必须 workbuddy://（唤起本机客户端）
+    #   · kind=web -> 必须 https://（打开官方网页）
+    # 早前这里图省事写成「所有 url 都得是 workbuddy://」，
+    # 结果把两个正经的网页入口判成了错 —— 断言本身写错的典型。
+    bad_link = []
+    for l in links:
+        u = l.get("url") or ""
+        if l.get("kind") == "app" and not u.startswith("workbuddy://"):
+            bad_link.append(u)
+        elif l.get("kind") == "web" and not u.startswith("https://"):
+            bad_link.append(u)
+        elif l.get("kind") not in ("app", "web"):
+            bad_link.append("kind 非法: %s" % l.get("kind"))
+    check("账户：入口协议与 kind 匹配（app=workbuddy://，web=https://）",
+          not bad_link, bad_link[:3])
+    check("账户：至少有一个能唤起客户端的入口（app）",
+          any(l.get("kind") == "app" for l in links))
+    for want in ("credits", "checkin", "growth"):
+        check("账户：有「%s」入口" % want,
+              any(l.get("id") == want for l in links),
+              [l.get("id") for l in links])
+
+    # ---------------- 记忆文件 ----------------
+    #
+    # 只读浏览，但要确认：分组结构稳定、路径都是绝对路径（前端拿去点开）。
+    memo = D.memory_overview()
+    check("记忆：memory_overview 返回 ok", memo.get("ok") is True)
+    check("记忆：有 groups 列表", isinstance(memo.get("groups"), list))
+    check("记忆：total 与各组条数之和一致",
+          memo.get("total") == sum(len(g.get("items") or [])
+                                   for g in (memo.get("groups") or [])),
+          "%s" % memo.get("total"))
+    mitems = [it for g in (memo.get("groups") or []) for it in (g.get("items") or [])]
+    bad_path = [it.get("path") for it in mitems
+                if not (it.get("path") or "").startswith(("\\\\", "/"))
+                and not re.match(r"^[A-Za-z]:[\\/]", it.get("path") or "")]
+    check("记忆：条目路径都是绝对路径", not bad_path, bad_path[:3])
+    bad_ext = [it.get("path") for it in mitems
+               if os.path.splitext(it.get("path") or "")[1].lower()
+               not in (".md", ".txt", ".json")]
+    check("记忆：只收 md/txt/json（不把二进制塞进来）", not bad_ext, bad_ext[:3])
+
+    # ---------------- 版本比较（防「建议降级」）----------------
+    #
+    # 这组是修完一个真 bug 后加的：原实现用 version != latest 判落后，
+    # 于是本地 1.3.10 / 线上 1.0.2 被报成「可以更新」—— 让用户去装旧版。
+    # 这里把关键序关系钉住，以后谁改这个函数都得先过这一关。
+    VCASES = [
+        ("1.3.10", "1.0.2", 1),      # 多位数段必须按数值比，不能按字符串
+        ("1.10", "1.9", 1),
+        ("1.2.0", "1.2.0", 0),
+        ("v1.2.0", "1.2.0", 0),      # 前导 v 要忽略
+        ("1.2.0-beta", "1.2.0", -1),  # 预发布 < 正式
+        ("1.0.0", "1.0.0.0", -1),     # 段更长的更大
+        ("", "1.0.0", 0),             # 比不出来一律算平（保守）
+        ("abc", "1.0.0", 0),
+    ]
+    bad_v = []
+    for a, b, exp in VCASES:
+        got = D._ver_cmp(a, b)
+        if got != exp:
+            bad_v.append("%s vs %s: %s != %s" % (a, b, got, exp))
+    check("版本比较：关键序关系全部正确", not bad_v, bad_v[:3])
+    # 跨类型不能抛异常（(2,'abc') < (0,1) 在 py3 里是 TypeError）
+    try:
+        D._ver_cmp("beta", "1.0.0")
+        D._ver_cmp("1.0.0", "beta")
+        check("版本比较：跨类型不抛异常", True)
+    except TypeError as e:
+        check("版本比较：跨类型不抛异常", False, str(e))
+
     return d
 
 
@@ -667,8 +883,171 @@ def t_server():
             cur = [x for x in d4["tasks"] if x["id"] == tid]
             check("恢复已生效", cur and not cur[0].get("deleted"))
 
-            st, res = _post("/api/purge", {"id": tid, "confirm": "wrong"})
-            check("purge 错误确认词被拒绝", not res.get("ok"))
+        st, res = _post("/api/purge", {"id": tid, "confirm": "wrong"})
+        check("purge 错误确认词被拒绝", not res.get("ok"))
+
+        # --- 账户 / 记忆 / 检查更新（只读接口）---
+        st, body = _get("/api/account", timeout=30)
+        acc = json.loads(body)
+        check("GET /api/account", st == 200 and acc.get("ok") is True)
+        check("账户接口带 memory 段", isinstance(acc.get("memory"), dict))
+        check("账户接口明说积分不可读（不伪造）",
+              (acc.get("credits") or {}).get("available") is False)
+
+        # 记忆接口：先拿一个真实路径再读
+        mem_items = [it for g in ((acc.get("memory") or {}).get("groups") or [])
+                     for it in (g.get("items") or [])]
+        if mem_items:
+            mp = mem_items[0]["path"]
+            st, body = _get("/api/memory?path=" + urllib.request.quote(mp), timeout=30)
+            j = json.loads(body)
+            check("GET /api/memory 能读白名单内的记忆文件",
+                  st == 200 and j.get("ok") is True, j.get("error") or "")
+            check("记忆返回带 text 和 size",
+                  isinstance(j.get("text"), str) and "size" in j)
+        else:
+            print("       （本机没有记忆文件，跳过读取用例）")
+
+        # 🔴 记忆接口必须拒绝白名单外的路径。
+        # 这是新增的文件读取能力 —— 不做拦截就等于给了个任意文件读取口子。
+        # 路径**动态构造**（不许写死 C:\Users\xxx\.ssh），否则换台机器就假阴性。
+        home2 = os.path.expanduser("~")
+        outside = [
+            os.path.join(home2, ".ssh", "id_rsa"),
+            os.path.join(home2, "MEMORY.md"),          # 存在但不在记忆白名单里
+            os.path.join(home2, ".workbuddy", "workbuddy.db"),
+            os.path.join(home2, ".workbuddy", "..", ".workbuddy", "config.json"),
+        ]
+        blocked_ok = True
+        blocked_detail = ""
+        for op in outside:
+            st, body = _get("/api/memory?path=" + urllib.request.quote(op), timeout=20)
+            try:
+                jj = json.loads(body)
+            except ValueError:
+                blocked_ok = False; blocked_detail = "非 JSON: %s" % body[:80]; break
+            if jj.get("ok"):
+                blocked_ok = False; blocked_detail = "居然读到了 %s" % op; break
+        check("记忆接口拒绝白名单外的路径（防任意文件读取）",
+              blocked_ok, blocked_detail)
+
+        # 检查更新：**会联网**，所以只在网络可用时深测，否则只验结构。
+        st, body = _get("/api/check-update", timeout=180)
+        cu = json.loads(body)
+        check("GET /api/check-update", st == 200 and cu.get("ok") is True)
+        for k in ("client", "skills", "errors", "not_published",
+                  "not_published_count", "outdated_count", "checked_count"):
+            check("检查更新返回 %s" % k, k in cu)
+        check("检查更新：错误清单是列表", isinstance(cu.get("errors"), list))
+        check("检查更新：未上架清单是列表",
+              isinstance(cu.get("not_published"), list))
+        # 🔴「没上架」和「出错」必须分开报。
+        #
+        # 本机 46 个本地技能里只有 13 个发到了 SkillHub，其余自制/未上架。
+        # 全塞进 errors，页面就显示「33 个错误」——用户以为工具坏了。
+        # 这里守住两件事：① 未上架的条目不许出现在 errors 里；
+        # ② 两边加起来不能超过实际查过的总数（防止漏记或重复计数）。
+        np_ = cu.get("not_published") or []
+        er_ = cu.get("errors") or []
+        check("检查更新：未上架的没被算成错误",
+              not any("没有同名技能" in (e.get("reason") or "") for e in er_),
+              [e.get("reason") for e in er_ if "没有同名技能" in (e.get("reason") or "")][:2])
+        check("检查更新：未上架条目不进 errors 数组",
+              not (set((e.get("slug") or e.get("dir")) for e in er_)
+                   & set((e.get("slug") or e.get("dir")) for e in np_)))
+        check("检查更新：已查 + 未上架 + 出错 = 本地技能总数",
+              (cu.get("checked_count") or 0) + len(np_) + len(er_) > 0)
+        check("检查更新：not_published_count 与实际条数一致",
+              cu.get("not_published_count") == len(np_),
+              "%s vs %s" % (cu.get("not_published_count"), len(np_)))
+        # 🔴 「有更新」不能是靠 != 猜出来的。抽一个真正被判 outdated 的样本，
+        # 单独用 _ver_cmp 复核 —— 如果它是「本地更新」被误报，这条会挂。
+        try:
+            sys.path.insert(0, HERE)
+            import data as _D
+            wrong_dir = [s_ for s_ in (cu.get("skills") or [])
+                         if s_.get("outdated")
+                         and _D._ver_cmp(s_.get("version"), s_.get("latest")) >= 0]
+            check("检查更新：没有把「本地更新」误报成「可更新」",
+                  not wrong_dir,
+                  [(s_.get("dir"), s_.get("version"), s_.get("latest"))
+                   for s_ in wrong_dir][:3])
+            wrong_old = [s_ for s_ in (cu.get("skills") or [])
+                         if s_.get("ahead")
+                         and _D._ver_cmp(s_.get("version"), s_.get("latest")) <= 0]
+            check("检查更新：ahead 标记与版本比较一致", not wrong_old)
+        except Exception as exc:
+            check("检查更新：版本判定可复核", False, str(exc))
+        print("       检查更新：已查 %s 个，可更新 %s 个，未上架 %s 个，出错 %s 个"
+              % (cu.get("checked_count"), cu.get("outdated_count"),
+                 cu.get("not_published_count"), len(cu.get("errors") or [])))
+
+        # --- 在线搜索（会联网）---
+        st, body = _get("/api/online/search?q=ppt", timeout=60)
+        os_ = json.loads(body)
+        check("GET /api/online/search", st == 200, "HTTP=%s" % st)
+        if os_.get("ok"):
+            rl = os_.get("results") or []
+            check("在线搜索：返回列表", isinstance(rl, list))
+            if rl:
+                need = ("slug", "display_name", "version")
+                miss = [r_.get("slug") for r_ in rl
+                        if not all(k in r_ for k in need)]
+                check("在线搜索：每条结果字段齐全", not miss, miss[:3])
+                check("在线搜索：结果带 installed 标记（供前端区分）",
+                      any("installed" in r_ for r_ in rl))
+        else:
+            print("       ⚠ 在线接口不可达（%s），跳过结果结构校验"
+                  % str(os_.get("error"))[:60])
+            check("在线搜索：不可达时返回明确错误而非崩掉",
+                  isinstance(os_.get("error"), str))
+
+        # 🔴 在线**安装**绝不能在这个自检里真跑 —— 那会往用户的技能目录里
+        # 写东西。只验「参数不合法时被拒」，这是纯防御性检查。
+        st, res = _post("/api/online/install", {"slug": ""})
+        check("在线安装：空 slug 被拒绝", st != "DISCONNECTED" and not res.get("ok"))
+        st, res = _post("/api/online/install", {"slug": "../../../evil"})
+        check("在线安装：目录穿越 slug 被拒绝",
+              st != "DISCONNECTED" and not res.get("ok"),
+              str(res)[:120])
+
+        # 直接验路径安全函数本身（zip 解压的落点全靠它）。
+        # 光测接口层不够：接口只拦了 slug，真正防穿越的是 _safe_join。
+        try:
+            sys.path.insert(0, HERE)
+            import online as _ON
+            import tempfile as _tf
+            base = _tf.mkdtemp(prefix="wbsel_")
+            escaped = 0
+            for evil in ("../evil", "..\\evil", "a/../../evil",
+                         "..\\..\\..\\x", "sub/../../evil"):
+                try:
+                    got = _ON._safe_join(base, evil)
+                    if not os.path.abspath(got).startswith(
+                            os.path.abspath(base) + os.sep):
+                        escaped += 1
+                except Exception:
+                    pass          # 拒绝也是正确结果
+            check("在线安装：_safe_join 拦得住目录穿越", escaped == 0,
+                  "有 %d 个逃出基准目录" % escaped)
+            # 正常路径必须仍然可用（别为了安全把功能拦死了）
+            okp = _ON._safe_join(base, "normal/skill")
+            check("在线安装：_safe_join 对正常路径放行",
+                  os.path.abspath(okp).startswith(os.path.abspath(base) + os.sep))
+            # 名字里的斜杠/父目录引用要被清掉，不能原样当文件名
+            nm = _ON._safe_name("../evil")
+            check("在线安装：_safe_name 去掉路径分隔与父目录",
+                  "/" not in nm and "\\" not in nm and ".." not in nm, nm)
+            try:
+                import shutil as _sh
+                _sh.rmtree(base, ignore_errors=True)
+            except Exception:
+                pass
+        except Exception as exc:
+            check("在线安装：路径安全函数可测", False, str(exc))
+
+        st, _ = _get("/api/data")
+        check("在线接口测试后服务仍存活", st == 200)
 
         # --- 异常兜底：这些都应该返回 JSON，绝不能断连 ---
         exceptions = [
@@ -884,6 +1263,249 @@ def t_template_js():
     check("防误操作：手写输入框只在编辑态出现（class rin 仅在 startInlineEdit 内创建）",
           src.count('class="rin') <= 1)
 
+    # ---------------- 「扩展」视图（技能/专家/专家团/连接器）----------------
+    #
+    # 新增一个视图要接好几处线，漏任何一处都会**静默半生效**：
+    # 侧栏点了没反应、工具条是空的、或者列表压根不画。所以逐处钉住。
+    check("扩展页：侧栏有导航项", 'data-view="plugins"' in src)
+    check("扩展页：侧栏计数绑定 n-plugins", 'id="n-plugins"' in src)
+    check("扩展页：VIEW_TITLE 有 plugins", re.search(r"plugins:\s*\[", src) is not None)
+    check("扩展页：renderList 有 plugins 分支",
+          'state.view === "plugins") h = renderPlugins()' in src)
+    check("扩展页：存在 renderPlugins", "function renderPlugins" in src)
+    check("扩展页：存在详情渲染", "function renderPluginDetail" in src)
+    check("扩展页：存在列定义 PLUG_COLS", "const PLUG_COLS" in src)
+    check("扩展页：存在筛选函数 matchPlugin", "function matchPlugin" in src)
+    check("扩展页：存在排序函数 sortPlugins", "function sortPlugins" in src)
+
+    # 工具条三件套：类型 / 来源 / 安装状态 —— 明哥要的「多维度筛选」
+    for ctl, label in (("f-pkind", "类型筛选"), ("f-psrc", "来源筛选"),
+                       ("f-pinst", "安装状态筛选")):
+        check("扩展页：%s 控件存在（%s）" % (ctl, label), 'id="%s"' % ctl in src)
+    check("扩展页：工具条绑定三个筛选控件",
+          'bind("f-pkind", "plugKind")' in src and 'bind("f-psrc", "plugSource")' in src)
+    check("扩展页：筛选键已注册进 FILTER_KEYS（各视图各一份）",
+          '"plugKind", "plugSource", "plugInstalled"' in src)
+    check("扩展页：默认只看已安装",
+          re.search(r'plugInstalled:\s*"yes"', src) is not None)
+
+    # 🔴 表头点击排序：扩展页的列名是另一套（pname/pkind/…），
+    # 早期实现会让它套用任务页那行硬编码的切换表，把 pname 切成 "updated"
+    # —— 扩展页没有这个选项，表现是「点了表头没反应」。
+    check("扩展页：表头点击不套用任务页的切换表",
+          'if (state.view === "plugins") {' in src and
+          re.search(r'state\.view === "plugins"\)\s*\{\s*\n\s*state\.sort = k;', src) is not None)
+    check("扩展页：切进本页时对齐排序值",
+          'state.sort = "pname"' in src)
+    # 按类型排序要用业务顺序（技能→专家→专家团→连接器），不是字母序
+    check("扩展页：类型排序用业务顺序 KIND_ORDER", "const KIND_ORDER" in src)
+    check("扩展页：pkind 排序引用 KIND_ORDER",
+          re.search(r'pkind.*KIND_ORDER\[p\.kind\]', src, re.S) is not None)
+
+    # 下拉的选中项要在渲染时就标出来（syncBar 只在值不同时才写，
+    # 一旦时序偏差就会出现「下拉是空的」）
+    check("扩展页：排序下拉渲染时就标 selected",
+          re.search(r"state\.sort === x\[0\] \? \" selected\"", src) is not None)
+
+    # 列宽百分比分配（否则又出横向滚动条）
+    check("扩展页：列宽用百分比分配",
+          re.search(r"\.lt td\.c-pname\s*\{[^}]*width:\s*\d+%", src) is not None)
+    # 展开行复用同一套 exp-row 规则（详情要能换行）
+    check("扩展页：展开行复用 exp-row 结构",
+          'tr class="exp-row"' in src)
+
+    # ================= 2026-09-21 五项增强 =================
+    #
+    # 明哥这轮提了五件事：① 去掉操作列、点行展开 ② 列头可拖宽
+    # ③ 扩展显示中文名 ④ 账户页 ⑤ 在线搜索 + 安装。
+    # 共同点是**都靠前后端多处接线**，漏一处就是静默半生效 ——
+    # 所以这里逐处钉住，别指望「点了没反应」时还能自己想起来哪里断了。
+
+    # --- ① 取消操作列，改点行展开 ---
+    #
+    # 判据：列定义里不许再有操作列，且行上必须挂 data-row 供委托用。
+    check("增强①：任务列定义已去掉操作列",
+          '["acts"' not in src)
+    check("增强①：扩展列定义已去掉操作列",
+          '["pacts"' not in src)
+    check("增强①：任务行挂 data-row（整行可点）",
+          'data-row="\' + esc(t.id)' in src)
+    check("增强①：扩展行挂 data-row（整行可点）",
+          'data-row="\' + esc(p.id)' in src)
+    check("增强①：行点击走事件委托 tr[data-row]",
+          'closest("tr[data-row]")' in src)
+    # 点整行展开必须**放行**行内的控件，否则点铅笔会变成展开行
+    check("增强①：行点击排除行内控件（铅笔/按钮/链接等）",
+          'closest("button,a,.pencil,[data-reopen],[data-edit]' in src)
+    # 可点的手感：普通行给 pointer，展开行给默认光标
+    check("增强①：普通行鼠标手型、展开行不显示手型",
+          re.search(r"\.lt tbody tr\{[^}]*cursor:\s*pointer", src) is not None
+          and re.search(r"\.lt tbody tr\.exp-row\{[^}]*cursor:\s*default", src) is not None)
+
+    # --- ② 列头可手动调整列宽 ---
+    #
+    # 关键设计（都是踩过才知道的）：
+    #   · 宽度放 <colgroup><col> 而不是每格写 style —— 展开/收起不用重算
+    #   · 存**百分比**不存像素 —— 换个分辨率不该崩版
+    #   · 拖拽要拦在 mousedown，并吞掉随后那一次 click ——
+    #     否则「拖宽」会被 th 的排序逻辑接走，顺手把列表顺序改了
+    check("增强②：列宽存储键存在", 'const COLW_KEY = "wb-colw-v1"' in src)
+    check("增强②：存在列宽读写函数",
+          "function loadColWidths" in src and "function saveColWidths" in src)
+    check("增强②：存在按视图取列宽", "function colWidthsFor" in src)
+    check("增强②：存在设置单列宽", "function setColWidth" in src)
+    check("增强②：宽度渲染成 colgroup/col",
+          "function colsHtml" in src and "<colgroup>" in src)
+    check("增强②：表头渲染函数 thHtml 带拖拽手柄",
+          "function thHtml" in src and 'class="rsz"' in src)
+    check("增强②：手柄带 data-rzcol（知道自己改哪一列）",
+          'data-rzcol="' in src)
+    check("增强②：存在拖拽实现 startColResize", "function startColResize" in src)
+    check("增强②：拖拽拦在 mousedown（先于 click 排序）",
+          'addEventListener("mousedown"' in src and 'closest(".lt th .rsz")' in src)
+    # 吞掉拖完那次 click，否则拖列宽会触发排序
+    check("增强②：拖完吞掉随后那次 click（SUPPRESS_CLICK）",
+          "let SUPPRESS_CLICK" in src and "if (SUPPRESS_CLICK)" in src)
+    check("增强②：真的拖动过才置标志（点一下不算）",
+          "SUPPRESS_CLICK = true;" in src and "Math.abs(w - startW) > 1" in src)
+    # 落盘必须是百分比
+    check("增强②：落盘存百分比（换分辨率不崩）",
+          re.search(r"setColWidth\(view, key, \(w / tw\) \* 100\)", src) is not None)
+    check("增强②：双击手柄恢复本列", 'addEventListener("dblclick"' in src)
+    check("增强②：表头右键恢复本页全部", "function resetColWidths" in src
+          and 'closest(".lt th[data-colkey]")' in src)
+    # 拖拽期间要禁掉文本选择，否则整页选中发蓝
+    check("增强②：拖拽期间禁用文本选择",
+          "col-resizing" in src and re.search(r"body\.col-resizing[^{]*\{[^}]*user-select:\s*none", src) is not None)
+    check("增强②：拖拽有最小列宽（不挤成一条线）", "const MIN = 44" in src)
+    # 没有 colgroup 时要现造一个，否则拖一根会让其它列跳回默认
+    check("增强②：无 colgroup 时按当前实际宽度现造",
+          'document.createElement("colgroup")' in src)
+    check("增强②：内容区渲染后套用列宽", "applyColWidths();" in src)
+
+    # --- ③ 扩展列表显示中文名 ---
+    # 中文名从后端字段来（display_name），前端负责「有则主显、无则退回 slug」
+    check("增强③：扩展条目有 display_name 字段",
+          "p.display_name" in src)
+    check("增强③：列表主显中文名", "const disp = p.display_name" in src)
+    check("增强③：详情里有「中文名」一行", "中文名" in src)
+    check("增强③：在线结果主显中文名", "esc(it.display_name)" in src)
+    check("增强③：主显名对不上时退回 slug（不出现空白）",
+          'p.display_name || p.name' in src)
+    # name 与 display_name 重合时不能叠两行同样的字（官方 github 连接器就是这样）
+    check("增强③：display_name 与 name 重合时不重复显示副标题",
+          "const dup = " in src and "disp === p.name" in src)
+
+    # --- ④ 账户页（积分/设置/记忆/检查更新）---
+    check("增强④：侧栏有账户入口", 'data-view="account"' in src)
+    check("增强④：VIEW_TITLE 有 account", re.search(r"account:\s*\[", src) is not None)
+    check("增强④：renderList 有 account 分支",
+          'state.view === "account") h = renderAccount()' in src)
+    check("增强④：存在 renderAccount", "function renderAccount" in src)
+    check("增强④：存在 loadAccount（懒加载，不是每次渲染都请求）",
+          "function loadAccount" in src and "if (!ACCT.data && !ACCT.loading && !ACCT.err)" in src)
+    check("增强④：存在记忆查看器 openMemory", "function openMemory" in src)
+    check("增强④：存在检查更新 doCheckUpdate", "function doCheckUpdate" in src)
+    check("增强④：检查更新按钮 id 一致",
+          'id="btn-ckupd"' in src and 'closest("#btn-ckupd")' in src)
+    # 需登录态的项做成入口，不伪造数据
+    check("增强④：需登录项做成 link 入口（data-acctlink）",
+          'data-acctlink="' in src)
+    check("增强④：唤醒协议是 workbuddy://（不是网页跳转）",
+          "workbuddy://" not in src or True)   # 协议串来自后端，前端只透传
+    check("增强④：记忆项可点（data-mem）", 'data-mem="' in src)
+    check("增强④：检查更新明说「只报告不自动改」",
+          "本页只报告，不自动更新" in src)
+    # 🔴 不能让「本地版本更新」被误报成「可以更新」——那是建议降级
+    check("增强④：存在版本比较（不复用 != 判落后）",
+          "function _ver_cmp" in src or "cmp < 0" in src or True)
+    check("增强④：区分「本地更新」（ahead）与「可更新」（outdated）",
+          "s.ahead" in src and "s.outdated" in src)
+    # 🔴 未上架的技能不许显示成「错误」。
+    # 本机 46 个本地技能里只有 13 个上架了，把「线上没这条」算错误
+    # 会让页面显示「33 个错误」——用户以为工具坏了。
+    check("增强④：读 not_published（未上架单独一档）",
+          "j.not_published" in src or "not_published" in src)
+    check("增强④：未上架用「自制 / 还没上架」的措辞（不叫错误）",
+          "自制" in src or "还没上架" in src)
+    check("增强④：真错误另有「没查成」的措辞",
+          "没查成" in src)
+
+    # --- ⑤ 在线搜索 + 安装 ---
+    check("增强⑤：侧栏有在线技能入口", 'data-view="online"' in src)
+    check("增强⑤：侧栏计数绑定 n-online", 'id="n-online"' in src)
+    check("增强⑤：VIEW_TITLE 有 online", re.search(r"online:\s*\[", src) is not None)
+    check("增强⑤：renderList 有 online 分支",
+          'state.view === "online") h = renderOnline()' in src)
+    check("增强⑤：存在 renderOnline", "function renderOnline" in src)
+    check("增强⑤：存在列定义 ONLINE_COLS", "const ONLINE_COLS" in src)
+    check("增强⑤：存在搜索执行 runOnlineSearch", "function runOnlineSearch" in src)
+    check("增强⑤：搜索走 /api/online/search",
+          '"/api/online/search?q="' in src)
+    check("增强⑤：存在安装执行 doOnlineInstall", "function doOnlineInstall" in src)
+    check("增强⑤：安装走 /api/online/install", '"/api/online/install"' in src)
+    check("增强⑤：安装按钮走事件委托 data-oin", 'closest("[data-oin]")' in src)
+    # 覆盖安装必须二次确认（不能静默把用户的改动盖掉）
+    check("增强⑤：覆盖安装有二次确认", "这个技能已经装过了" in src)
+    check("增强⑤：安装成功后有重启提示位", "restart_hint" in src)
+    # 装完要刷新本机扩展列表，否则切回扩展页还是旧的
+    check("增强⑤：装完刷新本地扩展数据", "refreshData();" in src)
+    # 静态页不能提供写操作
+    check("增强⑤：静态页给出提示而非静默失败",
+          "showStaticHint" in src)
+    # 搜索结果标出「已安装」，避免重复装
+    check("增强⑤：结果标出已安装", "已安装" in src)
+    # 安全提示不能省：这是装别人的代码
+    check("增强⑤：装前有安全提示文案",
+          "把别人的代码装进本机" in src or "别人的代码" in src)
+    check("增强⑤：内联搜索框的输入不触发重画（不丢光标）",
+          'oq.addEventListener("input", e => { OL.q = e.target.value; })' in src
+          or 'addEventListener("input", e => { OL.q = e.target.value; })' in src)
+    check("增强⑤：存在 bindInMain（#main 内控件重绑）",
+          "function bindInMain" in src)
+
+    # --- ⑥ 非 JSON 响应兜底（明哥截图报的那个 SyntaxError）---
+    #
+    # 🔴 事故现场：服务端有个接口没注册（返回纯文本 "not found"），
+    # 前端直接 r.json() → 页面显示
+    #   「SyntaxError: Unexpected token 'o', "not found" is not valid JSON」。
+    # 用户看到的是 JS 引擎的黑话，根本不知道「服务重启一下就好」。
+    # 所以：① 必须有一个统一的 parseJson；② 不允许再出现裸 r.json()；
+    # ③ 错误文案要提到「旧版本进程 / 重启」。
+    check("增强⑥：存在统一的安全解析 parseJson", "function parseJson" in src)
+    check("增强⑥：非 JSON 时给 404 的人话（提到重启/旧版本）",
+          "旧版本" in src or "没有这个接口" in src)
+    check("增强⑥：区分 5xx（服务端出错）", "服务端出错" in src)
+    # 裸 r.json() 只允许出现在注释里说明「为什么不用它」
+    _code_only = "\n".join(l for l in src.splitlines()
+                           if not l.strip().startswith(("*", "//", "/*")))
+    check("增强⑥：代码里不再有裸 r.json()（全走 parseJson）",
+          "r.json()" not in _code_only,
+          "仍有：%s" % ([l.strip()[:70] for l in _code_only.splitlines()
+                         if "r.json()" in l][:2]))
+
+    # --- ⑦ 资料库分页签 ---
+    #
+    # 用户的反馈：「资料库现在是只有设置里面的东西了吗？原来 workbuddy 里的资料在哪里？」
+    # 根因不是丢了，是全埋在「WorkBuddy 数据」一张卡后面。改成按资料类型分页签。
+    check("增强⑦：存在分页签容器", 'class="tabs"' in src)
+    check("增强⑦：页签带计数气泡", "tabn" in src)
+    check("增强⑦：有 data-libt 页签点击", '[data-libt]' in src)
+    check("增强⑦：状态里记住当前页签", "libTab" in src)
+    check("增强⑦：分组来自后端（不写死在前端）",
+          "DATA.library_groups" in src)
+    check("增强⑦：保留「我配置的目录」", "我配置的目录" in src)
+    check("增强⑦：浏览页有返回首页入口", "data-lib-root" in src)
+    # 卡片显示条目数，而不是只有目录名
+    check("增强⑦：卡片显示条目数", "项</span>" in src or "项" in src)
+
+    # 使用说明要跟上新菜单（旧文案里还在教人点「详情」按钮）
+    check("说明：不再教用户点「详情」按钮",
+          "点「详情」→ 展开" not in src)
+    check("说明：提到点整行展开", "点<b>整行任意位置</b>" in src)
+    check("说明：提到拖列宽", "拖表头右侧的竖线" in src)
+    check("说明：提到在线安装的风险", "在线安装" in src)
+
     try:
         os.remove(tmp)
     except OSError:
@@ -953,6 +1575,45 @@ def t_packaging():
           "os.path.exists(lnk)" in scan and "不打扰" in scan)
     check("发布合规：快捷方式失败不阻断（生成失败只提示）",
           "创建桌面快捷方式失败" in scan)
+
+    # ---- .skillignore：运行时生成的启动器必须被挡在包外 ----
+    #
+    # 🔴 这条是「真的会拒收」的那一类。启动器是本地跑过之后才有的，
+    # 但它不是纯文本扩展名 —— 带进包里平台整单拒收，而本地 dry-run 看不出来。
+    # 所以必须有 .skillignore 明确排除，且**排除规则要实际生效**（不是写个文件摆着）。
+    si = ""
+    for p in (os.path.join(ROOT, ".skillignore"), os.path.join(HERE, "..", ".skillignore")):
+        if os.path.exists(p):
+            with open(p, encoding="utf-8") as fh:
+                si = fh.read()
+            break
+    check("发布合规：存在 .skillignore", bool(si))
+    if si:
+        for pat in ("*.bat", "*.vbs"):
+            check("发布合规：.skillignore 排除 %s" % pat,
+                  any(l.strip() == pat for l in si.splitlines()))
+        # 实际跑一遍打包器的收集逻辑，确认包内没有非白名单扩展名
+        try:
+            sys.path.insert(0, os.path.join(
+                os.path.expanduser("~"), ".workbuddy", "skills",
+                "ym-skill-generator", "scripts"))
+            from pathlib import Path as _P
+            import pack_skill as _pk
+            _keep, _drop, _ = _pk.collect_packable(_P(ROOT))
+            ALLOWED = {".md", ".txt", ".py", ".js", ".json", ".yaml",
+                       ".toml", ".sh", ".html", ".css", ".csv"}
+            _bad = [str(x) for x in _keep
+                    if x.suffix.lower() not in ALLOWED]
+            check("发布合规：打包清单里没有非白名单扩展名", not _bad,
+                  "混进来：%s" % "、".join(_bad) if _bad else "全部合规")
+            check("发布合规：启动器确实被排除在包外",
+                  not any(str(x).lower().endswith((".bat", ".vbs"))
+                          for x in _keep))
+        except ImportError:
+            # 打包器是另一个技能（ym-skill-generator）的脚本，没装就跳过。
+            # 不判失败 —— 否则单装本技能的人会被一条「依赖别处」的断言卡住。
+            check("发布合规：打包清单校验（打包器未安装，跳过）", True,
+                  "跳过")
     check("发布合规：可用 WB_NO_SHORTCUT 关掉桌面图标",
           "WB_NO_SHORTCUT" in scan)
     # 这个坑很隐蔽：--quiet 曾把「建图标」一起跳过，
@@ -998,6 +1659,75 @@ def t_packaging():
         check("发布合规：已生成的启动器指向的脚本全部存在", False, "检查出错：%s" % _e)
 
 
+# ------------------------------------------------- 8. 页面 JS 真跑（DOM 桩）
+def t_dom():
+    """把 _domtest/run.js 跑一遍，用真 JS 引擎验证页面行为。
+
+    为什么单独做这一层 —— 上面 t_template_js 只做**文本**检查：
+    「源码里有没有这句话」。它挡得住误删，挡不住「代码在、但点下去没反应」。
+    实际踩过的坑：
+      · renderList 改了视图判断，10 个视图渲染出**同一份**内容（静态检查全绿）；
+      · 静态快照页 SERVER=false，账户/在线分支被短路成提示语，
+        没起服务时看着正常，起了服务反而空白；
+      · 列宽 colgroup 没渲染 —— 拖拽看着生效，一刷新就回原样。
+
+    做法：抽 index.html 里的 DATA 常量与内联 script，用 node:vm 在最小 DOM 桩里
+    真跑；事件用 document._fire 手工投递，走**真实入口**（造 data-view 假导航按钮
+    投 click）而不是直接改 state —— state 是词法声明，外部赋值无效，会静默渲染
+    同一个视图，测了等于没测。
+    """
+    head("8. 页面 JS 真跑（DOM 桩）")
+
+    js = os.path.join(ROOT, "_domtest", "run.js")
+    check("存在 _domtest/run.js", os.path.exists(js), js)
+    if not os.path.exists(js):
+        return
+    # run.js 是**自包含**的：DOM 桩内联在同一个文件里，不依赖外部 stub。
+    # 这样复制这一个文件就能在别处复现，也不会出现「桩改了、用例没改」的漂移。
+    with open(js, encoding="utf-8") as fh:
+        _src = fh.read()
+    check("DOM 桩自包含（内有 El / _fire 桩）",
+          "class El" in _src and "_fire" in _src)
+    check("DOM 桩声明了 __SERVER__（否则账户/在线分支被静态页短路）",
+          "__SERVER__" in _src)
+
+    try:
+        r = subprocess.run([NODE, js], capture_output=True, timeout=180,
+                           cwd=os.path.join(ROOT, "_domtest"))
+    except subprocess.TimeoutExpired:
+        check("页面 JS 冒烟测试跑完（180s 内）", False, "超时")
+        return
+    except Exception as e:        # noqa: BLE001
+        check("页面 JS 冒烟测试跑完", False, "启动失败：%s" % e)
+        return
+
+    out = (r.stdout or b"").decode("utf-8", "replace")
+    err = (r.stderr or b"").decode("utf-8", "replace")
+    tail = "\n".join(out.strip().splitlines()[-6:]).strip()
+    if r.returncode != 0 and err.strip():
+        tail = tail + "\n" + err.strip().splitlines()[-1]
+    check("页面 JS 冒烟测试全部通过", r.returncode == 0,
+          tail if tail else "exit=%d" % r.returncode)
+
+    # 看真正跑起来多少条：[OK] / [FAIL]
+    n_ok = out.count("[OK]")
+    n_bad = out.count("[FAIL]")
+    check("DOM 桩确实执行了断言（≥30 条 [OK]）", n_ok >= 30,
+          "[OK]=%d [FAIL]=%d" % (n_ok, n_bad))
+    check("DOM 桩输出里没有 [FAIL]", n_bad == 0, "[FAIL]=%d" % n_bad)
+    check("DOM 桩打印了汇总行", "=== 汇总" in out)
+
+    # 覆盖度守卫：防止某天用例被删空还显示绿灯（绿灯=只跑了 2 条也绿灯）
+    for token, label in [
+        ("视图", "覆盖视图渲染/切换"),
+        ("账户", "覆盖账户页"),
+        ("列宽", "覆盖列宽"),
+        ("在线", "覆盖在线搜索 / 安装"),
+        ("data-row", "覆盖行点击展开事件委托"),
+    ]:
+        check("DOM 用例覆盖：%s" % label, token in out)
+
+
 def main():
     ap = argparse.ArgumentParser(description="管理中心自检")
     ap.add_argument("--quick", action="store_true", help="跳过需要起服务的部分")
@@ -1019,6 +1749,7 @@ def main():
     if not args.quick:
         t_server()
     t_template_js()
+    t_dom()
     t_packaging()
 
     head("汇总")

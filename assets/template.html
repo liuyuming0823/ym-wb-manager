@@ -246,10 +246,28 @@ main{flex:1;padding:18px 22px 70px;max-width:1560px;width:100%}
 }
 .pcard:hover{border-color:#d3d8e0}
 .pcard .pn{font-weight:640;font-size:13.5px;display:flex;align-items:center;gap:7px;margin-bottom:6px}
+/* 路径只留最后两段，全路径放 title —— 长路径会把卡片撑得高低不齐 */
 .pcard .pp{font-size:11.5px;color:var(--text-3);word-break:break-all;margin-bottom:8px;line-height:1.5}
+.pcard .pp.one{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;word-break:normal;direction:rtl;text-align:left}
 .pcard .pst{display:flex;gap:11px;flex-wrap:wrap;font-size:12px;color:var(--text-3);margin-bottom:9px}
 .pcard .pst b{color:var(--text-2);font-weight:600}
 .pcard .acts{margin-top:0}
+.pcard.miss{border-style:dashed;border-color:#e0c9a0;background:var(--warn-soft)}
+
+/* 资料库分页签 */
+.tabs{display:flex;gap:5px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin-bottom:14px;padding-bottom:0}
+.tabs .tab{
+  background:transparent;border:1px solid transparent;border-bottom:2px solid transparent;
+  padding:7px 13px 8px;font-size:13px;color:var(--text-2);cursor:pointer;border-radius:7px 7px 0 0;
+  font-family:inherit;display:inline-flex;align-items:center;gap:6px;margin-bottom:-1px;
+}
+.tabs .tab:hover{background:var(--hover, rgba(0,0,0,.03));color:var(--text)}
+.tabs .tab.on{color:var(--accent);border-bottom-color:var(--accent);font-weight:640}
+.tabs .tab .tabn{
+  font-size:11px;background:var(--line);color:var(--text-3);border-radius:9px;
+  padding:0 6px;line-height:16px;font-weight:500;
+}
+.tabs .tab.on .tabn{background:var(--accent-soft,#e8f0fe);color:var(--accent)}
 
 .tbl{width:100%;border-collapse:collapse;background:var(--panel);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);font-size:13px}
 .tbl th{
@@ -291,6 +309,25 @@ main{flex:1;padding:18px 22px 70px;max-width:1560px;width:100%}
   /* 表头也省略号：窄屏时「标题（手动）」这类长表头不许折行 */
   overflow:hidden;text-overflow:ellipsis;
 }
+/* ---- 列宽拖拽手柄 ----
+   贴在表头右边缘的一条细线，鼠标移上去变粗、变色。
+   为什么做成「贴边 5px 命中区 + 1px 视觉线」而不是整块可拖：
+   整块可拖会和「点表头排序」抢事件，用户想排序时经常会拖到列宽。 */
+.lt th{position:relative}
+.lt th .rsz{
+  position:absolute;top:0;right:0;width:6px;height:100%;cursor:col-resize;
+  user-select:none;z-index:3;
+}
+.lt th .rsz::after{
+  content:"";position:absolute;top:20%;right:2px;width:1px;height:60%;
+  background:var(--line);transition:background .12s,width .12s;
+}
+.lt th .rsz:hover::after,.lt th .rsz.on::after{background:var(--accent);width:2px}
+/* 拖拽期间：全局禁选文字，光标保持 col-resize（否则拖到表格外光标会变） */
+body.col-resizing{cursor:col-resize;user-select:none}
+body.col-resizing *{cursor:col-resize !important}
+/* 表格已按用户设的宽度渲染过 —— 关掉自动布局，让宽度说了算 */
+.lt.fixed{table-layout:fixed}
 /* 可排序的表头 */
 .lt th.srt{cursor:pointer;user-select:none}
 .lt th.srt:hover{color:var(--accent)}
@@ -303,23 +340,46 @@ main{flex:1;padding:18px 22px 70px;max-width:1560px;width:100%}
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
 .lt tbody tr:last-child td{border-bottom:0}
+/* 整行可点：点行展开详情（明哥要求「取消操作列，点行展开」）。
+   用 cursor:pointer 明确告诉用户这行能点 —— 没有操作列之后，
+   如果光标还是箭头，用户根本不知道还能展开。 */
+.lt tbody tr{cursor:pointer}
 .lt tbody tr:hover td{background:var(--panel-2)}
 .lt tbody tr.open td{background:var(--accent-soft)}
 .lt tbody tr.open:hover td{background:var(--accent-soft)}
+/* 展开行本身不再响应点击（它里面是可读的详情，不是行） */
+.lt tbody tr.exp-row{cursor:default}
 .lt td.nowrap{white-space:nowrap}
 /* 展开行里的内容要能换行（它是详情，不是列表） */
 .lt tr.exp-row>td{white-space:normal;overflow:visible;padding:0}
-/* 列宽：百分比分配，加起来 100%。列表默认刚好一屏宽。 */
-.lt th.c-name,.lt td.c-name{width:17%}
-.lt th.c-cwd,.lt td.c-cwd{width:15%}
-.lt th.c-created,.lt td.c-created{width:9%}
-.lt th.c-updated,.lt td.c-updated{width:10%}
-.lt th.c-auto,.lt td.c-auto{width:14%}
+/* 列宽：百分比分配，加起来 100%。列表默认刚好一屏宽。
+   ⚠️ 这些只是**默认值**。用户拖过列宽之后，实际宽度以 <colgroup> 上的
+   内联样式为准（见 applyColWidths()），这些规则就被覆盖了。 */
+.lt th.c-name,.lt td.c-name{width:19%}
+.lt th.c-cwd,.lt td.c-cwd{width:16%}
+.lt th.c-created,.lt td.c-created{width:10%}
+.lt th.c-updated,.lt td.c-updated{width:11%}
+.lt th.c-auto,.lt td.c-auto{width:15%}
 .lt th.c-mode,.lt td.c-mode{width:6%}
-.lt th.c-model,.lt td.c-model{width:9%}
-.lt th.c-path,.lt td.c-path{width:7%}
-.lt th.c-title,.lt td.c-title{width:9%}
-.lt th.c-acts,.lt td.c-acts{width:4%}
+.lt th.c-model,.lt td.c-model{width:10%}
+.lt th.c-path,.lt td.c-path{width:8%}
+.lt th.c-title,.lt td.c-title{width:5%}
+/* 扩展列表的列宽（同样按比例分配，加起来 100%） */
+.lt th.c-pname,.lt td.c-pname{width:20%}
+.lt th.c-pkind,.lt td.c-pkind{width:8%}
+.lt th.c-psrc,.lt td.c-psrc{width:10%}
+.lt th.c-pdesc,.lt td.c-pdesc{width:28%}
+.lt th.c-pver,.lt td.c-pver{width:8%}
+.lt th.c-pauth,.lt td.c-pauth{width:10%}
+.lt th.c-pupd,.lt td.c-pupd{width:9%}
+.lt th.c-pstat,.lt td.c-pstat{width:7%}
+/* 在线搜索结果表 */
+.lt th.c-oname,.lt td.c-oname{width:24%}
+.lt th.c-oauthor,.lt td.c-oauthor{width:13%}
+.lt th.c-odesc,.lt td.c-odesc{width:32%}
+.lt th.c-over,.lt td.c-over{width:8%}
+.lt th.c-odl,.lt td.c-odl{width:10%}
+.lt th.c-ostat,.lt td.c-ostat{width:13%}
 /* 省略号统一工具类（td 上已有 overflow:hidden，这里只管行内的块级容器） */
 .lt .ell{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block;max-width:100%}
 /* 表格里的任务名：**默认不是编辑态**，点它=打开任务。
@@ -366,6 +426,68 @@ main{flex:1;padding:18px 22px 70px;max-width:1560px;width:100%}
 .lt .exp-in{padding:14px 16px;background:var(--panel-2)}
 /* 展开详情里的操作条 */
 .lt .dr-acts{display:flex;gap:7px;flex-wrap:wrap;margin-top:11px}
+
+/* ================= 账户页 ================= */
+.acct{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.acct .acard{
+  background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);
+  padding:15px 17px;box-shadow:var(--shadow);
+}
+.acct .acard h3{
+  margin:0 0 11px;font-size:13px;font-weight:650;color:var(--text);
+  display:flex;align-items:center;gap:7px;
+}
+.acct .acard h3 .ico{font-size:15px}
+.acct .acard .kv{grid-template-columns:70px 1fr;font-size:12.5px}
+.acct .acard .kv dt{color:var(--text-3)}
+.acct .acard .kv dd{margin:0;word-break:break-all}
+/* 账户头像块 */
+.acct .who{display:flex;align-items:center;gap:12px;margin-bottom:13px}
+.acct .avatar{
+  width:44px;height:44px;border-radius:12px;flex:none;
+  background:linear-gradient(135deg,#4a7cf7,#7b5cf0);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:600;
+}
+.acct .who .nm{font-size:15px;font-weight:650;color:var(--text)}
+.acct .who .sub{font-size:11.5px;color:var(--text-3);margin-top:3px}
+/* 入口按钮列表 */
+.acct .lnk{
+  display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:8px;
+  cursor:pointer;border:1px solid transparent;transition:background .12s,border-color .12s;
+}
+.acct .lnk:hover{background:var(--accent-soft);border-color:#cfe0ff}
+.acct .lnk .i{font-size:15px;flex:none;width:20px;text-align:center}
+.acct .lnk .t{font-size:12.5px;font-weight:600;color:var(--text)}
+.acct .lnk .h{font-size:11px;color:var(--text-3);margin-top:2px}
+.acct .lnk .arrow{margin-left:auto;color:var(--text-3);font-size:12px}
+.acct .lnk.dis{opacity:.5;cursor:default}
+.acct .lnk.dis:hover{background:none;border-color:transparent}
+
+/* 记忆清单 */
+.mem-item{
+  display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:7px;
+  cursor:pointer;border:1px solid transparent;
+}
+.mem-item:hover{background:var(--panel-2);border-color:var(--line)}
+.mem-item .fi{font-size:14px;flex:none}
+.mem-item .mn{font-size:12.5px;color:var(--text);flex:1;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mem-item .ms{font-size:11px;color:var(--text-3);flex:none}
+.mem-item .go{font-size:11px;color:var(--accent);flex:none;opacity:0}
+.mem-item:hover .go{opacity:1}
+
+/* 在线搜索区 */
+.ol-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.ol-bar .search{flex:1;min-width:220px}
+.ol-hint{font-size:12px;color:var(--text-3);line-height:1.7}
+.ol-res-count{font-size:12.5px;color:var(--text-2);margin-bottom:9px}
+/* 详情里的记忆正文预览 */
+.mem-view{
+  font-size:12.5px;line-height:1.75;color:var(--text-2);white-space:pre-wrap;
+  word-break:break-word;max-height:56vh;overflow:auto;
+  background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:12px 14px;
+  font-family:ui-monospace,"Cascadia Mono",Consolas,monospace;
+}
 /* 表格工具栏里的复选框 */
 .chk{display:flex;align-items:center;gap:5px;font-size:12.5px;color:var(--text-2);cursor:pointer;user-select:none;white-space:nowrap}
 .chk input{cursor:pointer;margin:0}
@@ -444,9 +566,12 @@ main{flex:1;padding:18px 22px 70px;max-width:1560px;width:100%}
       <button class="nav-i" data-view="projects"><span class="i">📁</span><span class="lbl">项目</span><span class="n" id="n-projects">0</span></button>
       <button class="nav-i" data-view="automations"><span class="i">⏰</span><span class="lbl">定时任务</span><span class="n" id="n-autos">0</span></button>
       <div class="nav-t">资源</div>
+      <button class="nav-i" data-view="plugins"><span class="i">🧩</span><span class="lbl">扩展</span><span class="n" id="n-plugins">0</span></button>
+      <button class="nav-i" data-view="online"><span class="i">🌐</span><span class="lbl">在线技能</span><span class="n" id="n-online"></span></button>
       <button class="nav-i" data-view="library"><span class="i">🗄️</span><span class="lbl">资料库</span></button>
       <button class="nav-i" data-view="trash"><span class="i">🗑️</span><span class="lbl">回收站</span><span class="n" id="n-trash">0</span></button>
       <div class="nav-t">关于</div>
+      <button class="nav-i" data-view="account"><span class="i">👤</span><span class="lbl">账户</span></button>
       <button class="nav-i" data-view="settings"><span class="i">⚙️</span><span class="lbl">设置与日志</span></button>
     </nav>
     <div class="side-f">
@@ -596,7 +721,7 @@ document.addEventListener("keydown", e => {
 function openPath(p) {
   if (!p) return;
   if (SERVER) {
-    fetch("/api/open?path=" + encodeURIComponent(p)).then(r => r.json()).then(j => {
+    fetch("/api/open?path=" + encodeURIComponent(p)).then(parseJson).then(j => {
       if (!j.ok) toast("打开失败：" + (j.error || "未知错误"), "err");
     }).catch(() => { toast("本地服务未响应，已复制路径", "err"); copy(p); });
   } else {
@@ -607,14 +732,14 @@ function openPath(p) {
 function revealPath(p) {
   if (!p) return;
   if (SERVER) {
-    fetch("/api/reveal?path=" + encodeURIComponent(p)).then(r => r.json()).then(j => {
+    fetch("/api/reveal?path=" + encodeURIComponent(p)).then(parseJson).then(j => {
       if (!j.ok) toast("打开目录失败：" + (j.error || ""), "err");
     }).catch(() => copy(p));
   } else copy(p, "已复制路径（静态模式请手动打开）");
 }
 function openTask(id, title) {
   if (SERVER) {
-    fetch("/api/reopen?id=" + encodeURIComponent(id)).then(r => r.json()).then(j => {
+    fetch("/api/reopen?id=" + encodeURIComponent(id)).then(parseJson).then(j => {
       if (j && j.ok) toast("已唤起：" + String(title || "").slice(0, 22), "ok");
       else toast("唤起失败：" + ((j && j.error) || ""), "err");
     }).catch(() => { location.href = "workbuddy://chat/" + encodeURIComponent(id); });
@@ -637,7 +762,49 @@ function api(path, opts) {
     ].join("\n"), [{ label: "知道了" }]);
     return Promise.reject(new Error("static"));
   }
-  return fetch(path, opts).then(r => r.json());
+  return fetch(path, opts).then(parseJson);
+}
+
+/* 安全解析 JSON 响应。
+ *
+ * 🔴 为什么不能直接 r.json()：服务端出错时返回的不一定是 JSON。
+ *   · 路由没注册 → 纯文本 "not found"（404）
+ *   · 未捕获异常 → HTML traceback 页
+ * 这时候 r.json() 会抛 `SyntaxError: Unexpected token 'o', "not found" is not valid JSON`，
+ * 用户看到的是这句天书，根本不知道是「服务端这个接口不存在」。
+ * 更坑的是**旧版本服务进程还活着**时就是这个症状：新版页面配旧版后端。
+ * 所以统一在这里兜住：非 JSON 就给一句人话 + 提示重启服务。
+ */
+function parseJson(r) {
+  return r.text().then(t => {
+    try {
+      return JSON.parse(t);
+    } catch (e) {
+      // 把「服务端没这个接口」翻译成人能看懂的话
+      if (r.status === 404) {
+        throw new Error("服务端没有这个接口（HTTP 404）。" +
+          "多半是管理中心的服务还是旧版本进程，请关掉后重新双击「启动管理中心」再试。");
+      }
+      if (r.status >= 500) {
+        throw new Error("服务端出错了（HTTP " + r.status + "）。" +
+          "常见原因是这个接口需要本地服务；若服务在跑，请看服务窗口里的报错。");
+      }
+      throw new Error("服务端返回的不是 JSON（HTTP " + r.status + "）：" +
+        String(t || "").slice(0, 120));
+    }
+  });
+}
+
+/* 带错误兜底的取数：非 2xx 或非 JSON 都变成可读的错误对象 */
+function apiJson(path, opts) {
+  return fetch(path, opts).then(r =>
+    parseJson(r).then(j => {
+      if (r.status >= 400 && (!j || j.ok !== false)) {
+        return { ok: false, error: "服务端返回 HTTP " + r.status };
+      }
+      return j;
+    })
+  );
 }
 
 /* ================= 图标 ================= */
@@ -680,6 +847,8 @@ function modeBadge(m) {
 const FILTER_KEYS = [
   "q", "status", "mode", "kind", "time", "sort", "quick",
   "projScope", "autoScope", "cards",
+  // 扩展页专用：类型 / 来源 / 安装状态
+  "plugKind", "plugSource", "plugInstalled",
 ];
 function blankFilter() {
   return {
@@ -689,6 +858,12 @@ function blankFilter() {
     // 默认看全部：定时任务本来就少，而且很多是一次性、跑完就没有「下次运行」了，
     // 默认只看「启用中」会让整页空掉，容易让人以为功能坏了。
     autoScope: "all",    // all | live | done | deleted
+    // ---- 扩展页 ----
+    plugKind: "",        // 空=全部类型
+    plugSource: "",      // 空=全部来源
+    // 默认只看「已安装」：市场货架上还有 80 多个没装的东西，
+    // 全列出来会让「我到底装了什么」这个问题变得没法回答。
+    plugInstalled: "yes",
     // 默认列表（带表头）—— 明哥明确要求的默认形态。
     // 勾上「卡片视图」才切回原来的卡片样式。
     cards: false,
@@ -697,7 +872,8 @@ function blankFilter() {
 
 const state = {
   view: "overview",
-  libPath: "",          // 资料库当前目录（跨视图复用，因为资料库里没有别的筛选）
+  libPath: "",          // 资料库当前目录（空 = 首页）
+  libTab: "",           // 资料库当前页签（空 = 第一个页签）
   filters: {},          // view -> 筛选条件
 };
 
@@ -725,8 +901,11 @@ const VIEW_TITLE = {
   tasks: ["任务", "所有会话任务"],
   projects: ["项目", "工作目录"],
   automations: ["定时任务", "周期与提醒"],
+  plugins: ["扩展", "已安装的技能、专家、专家团与连接器"],
+  online: ["在线技能", "从 SkillHub 搜索并安装技能"],
   library: ["资料库", "文件浏览"],
   trash: ["回收站", "已删除的任务与定时任务"],
+  account: ["账户", "积分、记忆、设置与更新"],
   settings: ["设置与日志", "备份、操作记录"],
 };
 
@@ -783,6 +962,73 @@ function sortTasks(arr) {
   });
 }
 
+/* ================= 扩展页的筛选与排序 ================= */
+
+const KIND_LABEL = {
+  skill: "技能", expert: "专家", team: "专家团",
+  connector: "连接器", plugin: "内置功能",
+};
+// 「按类型排序」用业务顺序，不用字母序。
+// 字母序会排成 连接器→专家→内置功能→技能→专家团（connector < expert < …），
+// 既不是明哥列举的顺序，也不符合「先看自己装的技能、再看专家」的直觉。
+const KIND_ORDER = { skill: 1, expert: 2, team: 3, connector: 4, plugin: 5 };
+const KIND_BADGE = {
+  skill: "b-mode", expert: "b-run", team: "b-auto",
+  connector: "b-done", plugin: "b-mode",
+};
+
+// 来源归成四大类：细分的 marketplace（专家市场/官方市场/团队市场…）有 11 种，
+// 直接做下拉会太长；人真正想问的是「这是自带的、我自己装的、还是市场下的」。
+function plugSrcGroup(p) {
+  if (p.marketplace === "mcp") return "mcp";
+  if (p.marketplace === "local" || p.source === "本地目录") return "local";
+  if (p.marketplace === "workbuddy-builtin") return "builtin";
+  return "market";
+}
+const SRC_LABEL = {
+  builtin: "内置", local: "本地", market: "市场", mcp: "MCP 配置",
+};
+
+function matchPlugin(p) {
+  if (state.plugInstalled === "yes" && !p.installed) return false;
+  if (state.plugInstalled === "no" && p.installed) return false;
+  if (state.plugKind && p.kind !== state.plugKind) return false;
+  if (state.plugSource && plugSrcGroup(p) !== state.plugSource) return false;
+
+  const q = state.q.toLowerCase();
+  if (q) {
+    const hay = [p.name, p.desc, p.author, p.version, p.path, p.source,
+      p.marketplace, (p.keywords || []).join(" "), p.id
+    ].join(" ").toLowerCase();
+    if (!hay.includes(q)) return false;
+  }
+  return true;
+}
+
+function sortPlugins(arr) {
+  const s = state.sort;
+  // 只在值真的不同时才比，避免「相等却返回非 0」导致排序不稳定
+  const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+  const key = p => {
+    if (s === "pkind") {
+      const o = KIND_ORDER[p.kind] || 9;
+      return "0" + o + " " + (p.name || "").toLowerCase();
+    }
+    if (s === "psrc") return plugSrcGroup(p) + " " + (p.name || "").toLowerCase();
+    if (s === "pupdated") return p.updated_at || "";
+    if (s === "pinst") return p.installed_at || p.updated_at || "";
+    return (p.name || "").toLowerCase();
+  };
+  // 时间类倒序（最近的在前），其余升序
+  const desc = (s === "pupdated" || s === "pinst");
+  return arr.slice().sort((a, b) => {
+    const ka = key(a), kb = key(b);
+    // 没有时间的排最后，而不是混在最前面（默认按名称时不受影响）
+    if (desc && !ka !== !kb) return ka ? -1 : 1;
+    return desc ? -cmp(ka, kb) : cmp(ka, kb);
+  });
+}
+
 /* ================= 顶栏 / 工具条 ================= */
 //
 // 这一块要和「打字」严格分开，否则会出现两个连在一起的怪现象：
@@ -814,7 +1060,13 @@ function renderSidebar() {
   $("#n-tasks").textContent = s.live;
   $("#n-projects").textContent = s.project_count;
   $("#n-autos").textContent = s.automation_count;
+  // 侧栏显示已安装数（不是总数）—— 市场货架上还有几十个没装的，
+  // 显示总数会让「我装了多少」这个问题答不上来。
+  const np = $("#n-plugins");
+  if (np) np.textContent = s.plugin_installed != null ? s.plugin_installed : (s.plugin_count || 0);
   $("#n-trash").textContent = s.deleted + s.automation_deleted;
+  const na = $("#n-online");
+  if (na) na.textContent = OL.results ? OL.results.length : "";
   $$("#nav .nav-i").forEach(b => b.classList.toggle("on", b.dataset.view === state.view));
 }
 
@@ -847,7 +1099,8 @@ function buildBar(force) {
     h += '<select id="sort">' +
       [['updated', '最近更新'], ['oldest', '最久未动'], ['created', '创建时间'], ['name', '任务名'],
        ['arts', '产物数量'], ['credits', '积分消耗']].map(x =>
-        '<option value="' + x[0] + '">' + x[1] + "</option>").join("") + "</select>";
+        '<option value="' + x[0] + '"' + (state.sort === x[0] ? " selected" : "") + ">" +
+        x[1] + "</option>").join("") + "</select>";
     h += '<label class="chk"><input type="checkbox" id="f-cards"> 卡片视图</label>';
     h += '<button class="btn" id="btn-clear">清空筛选</button>';
   } else if (state.view === "projects") {
@@ -862,8 +1115,43 @@ function buildBar(force) {
       [['live', '只看启用中'], ['done', '只看已执行完'], ['deleted', '只看已删除'], ['all', '全部']].map(x =>
         '<option value="' + x[0] + '">' + x[1] + "</option>").join("") + "</select>";
     h += '<button class="btn" id="btn-clear">清空筛选</button>';
+  } else if (state.view === "plugins") {
+    h += '<div class="search"><input id="q" type="text" placeholder="搜索名称、描述、作者、路径…" autocomplete="off" spellcheck="false"></div>';
+    h += '<select id="f-pkind"><option value="">全部类型</option>' +
+      [['skill', '技能'], ['expert', '专家'], ['team', '专家团'],
+       ['connector', '连接器'], ['plugin', '内置功能']].map(x =>
+        '<option value="' + x[0] + '">' + x[1] + "</option>").join("") + "</select>";
+    h += '<select id="f-psrc"><option value="">全部来源</option>' +
+      [['builtin', '内置'], ['local', '本地（自己装的）'], ['market', '市场装的'],
+       ['mcp', 'MCP 配置']].map(x =>
+        '<option value="' + x[0] + '">' + x[1] + "</option>").join("") + "</select>";
+    h += '<select id="f-pinst">' +
+      [['yes', '只看已安装'], ['no', '只看货架上的'], ['all', '全部']].map(x =>
+        '<option value="' + x[0] + '"' +
+        (state.plugInstalled === x[0] ? " selected" : "") + ">" + x[1] + "</option>").join("") + "</select>";
+    // 生成时就标 selected：syncBar() 只在「值不一样」时才写，
+    // 而它默认值恰好也是第一项，写不写都一个样 —— 一旦哪次时序有偏差
+    // 就会出现「下拉是空的」。服务端渲染阶段就把选中项定死最稳。
+    h += '<select id="sort">' +
+      [['pname', '名称'], ['pkind', '类型'], ['psrc', '来源'],
+       ['pupdated', '最近更新'], ['pinst', '安装时间']].map(x =>
+        '<option value="' + x[0] + '"' + (state.sort === x[0] ? " selected" : "") + ">" +
+        x[1] + "</option>").join("") + "</select>";
+    h += '<button class="btn" id="btn-clear">清空筛选</button>';
+  } else if (state.view === "online") {
+    h += '<div class="search"><input id="ol-qbar" type="text" ' +
+      'placeholder="搜在线技能（回车即可）…" autocomplete="off" spellcheck="false"></div>';
+    h += '<button class="btn primary" id="ol-gobar">🔍 搜索</button>';
+    h += '<button class="btn" id="ol-reset">清空结果</button>';
   } else if (state.view === "library") {
-    h += '<div class="search"><input id="q" type="text" placeholder="在当前目录中过滤文件名…" autocomplete="off" spellcheck="false"></div>';
+    // 只有在浏览某个目录时「过滤文件名」才有意义；首页是页签+卡片，没有列表可筛。
+    if (state.libPath) {
+      h += '<div class="search"><input id="q" type="text" placeholder="在当前目录中过滤文件名…" autocomplete="off" spellcheck="false"></div>';
+      h += '<button class="btn" id="lib-home">返回资料库首页</button>';
+    }
+  } else if (state.view === "account") {
+    h += '<button class="btn" id="acct-reload">🔄 重新读取</button>';
+    h += '<button class="btn" id="acct-open">📂 打开数据目录</button>';
   } else if (state.view === "settings") {
     h += '<button class="btn" id="btn-bak">立即备份数据库</button>';
     h += '<button class="btn" id="btn-log">查看操作日志</button>';
@@ -879,6 +1167,10 @@ function buildBar(force) {
   if ($("#q")) {
     $("#q").addEventListener("input", e => { state.q = e.target.value; renderList(); });
   }
+  const lh = $("#lib-home");
+  if (lh) lh.addEventListener("click", () => {
+    state.libPath = ""; state.q = ""; window.__LIB_CACHE__ = null; render();
+  });
   const bind = (id, key) => {
     const el = $("#" + id);
     if (el) el.addEventListener("change", e => { state[key] = e.target.value; renderList(); });
@@ -886,6 +1178,8 @@ function buildBar(force) {
   bind("f-status", "status"); bind("f-mode", "mode"); bind("f-kind", "kind");
   bind("f-time", "time"); bind("sort", "sort");
   bind("f-proj", "projScope"); bind("f-auto", "autoScope");
+  bind("f-pkind", "plugKind"); bind("f-psrc", "plugSource");
+  bind("f-pinst", "plugInstalled");
 
   const cb = $("#f-cards");
   if (cb) cb.addEventListener("change", e => { state.cards = e.target.checked; renderList(); });
@@ -903,6 +1197,28 @@ function buildBar(force) {
   if (bb) bb.addEventListener("click", doBackup);
   const bl = $("#btn-log");
   if (bl) bl.addEventListener("click", doShowLog);
+
+  // ---- 在线技能工具条 ----
+  const og = $("#ol-gobar");
+  const oq = $("#ol-qbar");
+  if (og) og.addEventListener("click", runOnlineSearch);
+  if (oq) oq.addEventListener("keydown", e => { if (e.key === "Enter") runOnlineSearch(); });
+  const ors = $("#ol-reset");
+  if (ors) ors.addEventListener("click", () => {
+    OL.results = null; OL.err = ""; OL.q = "";
+    const iq = $("#ol-qbar"); if (iq) iq.value = "";
+    renderList();
+  });
+
+  // ---- 账户工具条 ----
+  const ar = $("#acct-reload");
+  if (ar) ar.addEventListener("click", () => { ACCT.data = null; ACCT.err = ""; loadAccount(); });
+  const ao = $("#acct-open");
+  if (ao) ao.addEventListener("click", () => {
+    const d = (ACCT.data || {}).client || {};
+    if (d.data_dir) revealPath(d.data_dir);
+    else toast("数据目录未知", "err");
+  });
 }
 
 // 把 state 里的筛选值同步到已经存在的控件上（不新建 DOM）。
@@ -914,6 +1230,8 @@ function syncBar() {
   set("f-status", state.status); set("f-mode", state.mode); set("f-kind", state.kind);
   set("f-time", state.time); set("sort", state.sort);
   set("f-proj", state.projScope); set("f-auto", state.autoScope);
+  set("f-pkind", state.plugKind); set("f-psrc", state.plugSource);
+  set("f-pinst", state.plugInstalled);
   const cb = $("#f-cards");
   if (cb && cb.checked !== !!state.cards) cb.checked = !!state.cards;
 }
@@ -1070,12 +1388,180 @@ function renderRow(t) {
   return h;
 }
 
-/* ================= 视图：任务 ================= */
+/* ================= 列宽（手动调整 + 持久化） =================
+   //
+   // 明哥的要求：所有列头都能手动拖宽窄。
+   //
+   // 关键实现点：
+   //   1. 用 <colgroup><col> 承载宽度，而不是给每个 th/td 写 style ——
+   //      col 是「整列的宽度定义」，浏览器会把同列所有单元格一起改，
+   //      不用在展开/收起时重算每一格。
+   //   2. 宽度存 localStorage，**按视图分开存**（任务页拖窄了「目录」，
+   //      不该影响扩展页）。存的是像素，但要能适应窗口变化，所以
+   //      拖动结束后按「当前表格总宽」换算成百分比再存 ——
+   //      存像素的话，换个分辨率打开会把最后一列挤没。
+   //   3. 双击手柄 = 恢复该列默认宽度；表头右键 = 全部恢复。
+*/
+const COLW_KEY = "wb-colw-v1";
+
+// 拖完列宽会紧接着触发一次 click（mouseup 之后的那个）。如果不吞掉，
+// 这一下会被 th[data-sortkey] 当成「点表头排序」——用户只是想拖宽一点，
+// 结果列表顺序变了。用一次性标记把它吃掉，比给每个 th 加 lock 类干净。
+let SUPPRESS_CLICK = false;
+
+function loadColWidths() {
+  try {
+    const raw = localStorage.getItem(COLW_KEY);
+    return raw ? (JSON.parse(raw) || {}) : {};
+  } catch (e) { return {}; }
+}
+function saveColWidths(all) {
+  try { localStorage.setItem(COLW_KEY, JSON.stringify(all)); } catch (e) { /* 隐私模式等 */ }
+}
+// 当前视图 -> {列 key: 百分比}
+function colWidthsFor(view) {
+  const all = loadColWidths();
+  return all[view] || null;
+}
+function setColWidth(view, key, pct) {
+  const all = loadColWidths();
+  if (!all[view]) all[view] = {};
+  all[view][key] = Math.round(pct * 1000) / 1000;
+  saveColWidths(all);
+}
+function clearColWidths(view) {
+  const all = loadColWidths();
+  delete all[view];
+  saveColWidths(all);
+}
+
+// 把宽度渲染成 <colgroup>。没设过的列走 CSS 里的默认百分比。
+function colsHtml(view, cols) {
+  const w = colWidthsFor(view);
+  if (!w) return "";
+  let h = "<colgroup>";
+  cols.forEach(c => {
+    const p = w[c[0]];
+    h += "<col" + (p ? ' style="width:' + p + '%"' : "") + ">";
+  });
+  return h + "</colgroup>";
+}
+
+function hasCustomCols(view) { return !!colWidthsFor(view); }
+
+/* 表头单元格：标签 + 排序箭头 + 拖拽手柄 */
+function thHtml(view, c) {
+  const [k, label, srt, cls] = c;
+  return '<th class="' + cls + (srt ? " srt" : "") +
+    (srt && state.sort === srt ? " on" : "") + '"' +
+    (srt ? ' data-sortkey="' + srt + '" title="点一下按' + esc(label) + '排序"' : "") +
+    ' data-colkey="' + k + '">' +
+    esc(label) + (srt ? sortArrow(srt) : "") +
+    '<span class="rsz" data-rzcol="' + k + '" data-rzview="' + esc(view) +
+    '" title="拖动调整列宽 · 双击恢复本列默认"></span></th>';
+}
+
+/* 拖动列宽。mousedown 在手柄上时接管，直到松开。 */
+function startColResize(e, handle) {
+  const th = handle.closest("th");
+  const table = handle.closest("table");
+  if (!th || !table) return;
+  const view = handle.dataset.rzview || state.view;
+  const key = handle.dataset.rzcol;
+  e.preventDefault();
+  e.stopPropagation();
+
+  const cols = Array.from(table.querySelectorAll("colgroup > col"));
+  const ths = Array.from(table.querySelectorAll("thead > tr > th"));
+  const idx = ths.indexOf(th);
+  if (idx < 0) return;
+
+  // 表格当前总宽（用来把像素换算成百分比）
+  const totalW = table.getBoundingClientRect().width || 1;
+  const startX = e.clientX;
+  const startW = th.getBoundingClientRect().width;
+  const MIN = 44;                        // 再窄就只剩省略号了
+
+  // 没有 colgroup 时现造一个：把当前每列实际宽度写进去当起点，
+  // 这样拖一根不会让其它列突然跳回 CSS 默认值。
+  if (!cols.length) {
+    const cg = document.createElement("colgroup");
+    ths.forEach(t => {
+      const c = document.createElement("col");
+      c.style.width = t.getBoundingClientRect().width + "px";
+      cg.appendChild(c);
+    });
+    table.insertBefore(cg, table.firstChild);
+  }
+  const colEls = Array.from(table.querySelectorAll("colgroup > col"));
+  const col = colEls[idx];
+  if (!col) return;
+
+  handle.classList.add("on");
+  document.body.classList.add("col-resizing");
+  // 拖拽期间固定列宽语义：table-layout:fixed 才不会因为内容宽度又弹回去
+  table.classList.add("fixed");
+
+  const others = colEls.filter((_, i) => i !== idx);
+  const othersW = others.reduce((s, c) => s + c.getBoundingClientRect().width, 0);
+
+  function onMove(ev) {
+    let w = startW + (ev.clientX - startX);
+    w = Math.max(MIN, w);
+    // 不许把其它列挤到 0：至少给每列留 MIN
+    if (othersW > 0 && w > totalW - MIN * others.length) {
+      w = Math.max(MIN, totalW - MIN * others.length);
+    }
+    col.style.width = w + "px";
+    handle.dataset.lastw = String(w);
+  }
+  function onUp() {
+    document.removeEventListener("mousemove", onMove);
+    document.removeEventListener("mouseup", onUp);
+    handle.classList.remove("on");
+    document.body.classList.remove("col-resizing");
+    // 落盘：像素 -> 百分比（存像素换分辨率就崩）
+    const w = parseFloat(handle.dataset.lastw || "0");
+    if (w > 0) {
+      const tw = table.getBoundingClientRect().width || totalW;
+      // 只在真的拖了才存（点一下不算）
+      if (Math.abs(w - startW) > 1) {
+        setColWidth(view, key, (w / tw) * 100);
+        SUPPRESS_CLICK = true;   // 吞掉紧接着那一下 click
+      }
+    }
+    delete handle.dataset.lastw;
+  }
+  document.addEventListener("mousemove", onMove);
+  document.addEventListener("mouseup", onUp);
+}
+
+/* 表格渲染完后，把存下来的宽度应用上去。
+   为什么不在生成 HTML 时一次写完：因为 -1 列（自动宽度）需要
+   先让浏览器算一次才拿得到像素值。 */
+function applyColWidths() {
+  $$("table.lt").forEach(tb => {
+    if (tb.querySelector("colgroup > col")) tb.classList.add("fixed");
+  });
+}
+
+// 恢复某个视图的所有列宽
+function resetColWidths(view) {
+  clearColWidths(view);
+  renderList();
+  toast("已恢复默认列宽", "ok");
+}
+
+
 //
 // 两种形态：
-//   · 表格（默认）— 带表头，一屏能看几十条，列头可点排序，标题可点直接改
+//   · 表格（默认）— 带表头，一屏能看几十条，列头可点排序、可拖列宽
 //   · 卡片（勾「卡片视图」）— 原来的样子，信息密度低但一眼看得清状态
 // 两种形态共用 renderTaskDetail()，所以展开后看到的内容完全一致。
+//
+// ⚠️ 这里**没有「操作」列**了（明哥要求取消）。
+// 删除 / 恢复 / 展开这些动作全部收进「点行展开」之后的详情里 ——
+// 列表只管看，动作在展开区里做，误点风险小得多。
 const TASK_COLS = [
   // key       表头          排序字段（空=不可排序）  列宽类
   ["name",    "任务名",      "name",     "c-name"],
@@ -1087,7 +1573,6 @@ const TASK_COLS = [
   ["model",   "模型",        "",         "c-model"],
   ["jsonl",   "对话记录",    "",         "c-path"],
   ["title",   "标题（手动）", "name",     "c-title"],
-  ["acts",    "操作",        "",         "c-acts"],
 ];
 function sortArrow(key) {
   if (!key || state.sort !== key) return '<span class="ar">↕</span>';
@@ -1096,13 +1581,12 @@ function sortArrow(key) {
 }
 
 function renderTaskTable(list) {
-  let h = '<div class="lt-wrap"><table class="lt"><thead><tr>';
-  TASK_COLS.forEach(c => {
-    const [k, label, srt, cls] = c;
-    h += '<th class="' + (srt ? "srt" : "") + (srt && state.sort === srt ? " on" : "") + '"' +
-      (srt ? ' data-sortkey="' + srt + '" title="点一下按' + esc(label) + '排序"' : "") + ">" +
-      esc(label) + (srt ? sortArrow(srt) : "") + "</th>";
-  });
+  const view = state.view;
+  let h = '<div class="lt-wrap"><table class="lt' +
+    (hasCustomCols(view) ? " fixed" : "") + '">';
+  h += colsHtml(view, TASK_COLS);
+  h += "<thead><tr>";
+  TASK_COLS.forEach(c => { h += thHtml(view, c); });
   h += "</tr></thead><tbody>";
   list.forEach(t => {
     const open = openSet.has(t.id);
@@ -1112,10 +1596,15 @@ function renderTaskTable(list) {
     const hasCustom = !!t.custom_title;
     const rowCls = (open ? "open" : "") + (t.deleted ? " is-del" : "");
 
-    h += '<tr class="' + rowCls.trim() + '" data-id="' + esc(t.id) + '">';
+    // 整行可点（data-row）：点任何非交互位置 = 展开/收起详情。
+    // 标题上挂 data-reopen（打开任务）、铅笔挂 data-edit（改名），
+    // 这两个是行内的例外，靠 data-* 优先级在事件委托里拦下来。
+    h += '<tr class="' + rowCls.trim() + '" data-id="' + esc(t.id) +
+      '" data-row="' + esc(t.id) + '" title="' +
+      (open ? "点击收起详情" : "点击展开详情") + '">';
 
     // 任务名：点名称 = 打开任务（**不是编辑**）。
-    // 改名统一走「标题（手动）」列的小铅笔，或操作列里的铅笔 ——
+    // 改名统一走「标题（手动）」列的小铅笔 ——
     // 明哥的反馈：点哪都能编太容易误操作，改成必须点图标才进编辑态。
     h += '<td class="c-name">';
     h += '<span class="ename' + (hasCustom ? "" : " unnamed") + '" data-reopen="' + esc(t.id) + '" ' +
@@ -1162,14 +1651,6 @@ function renderTaskTable(list) {
       h += '<button class="pencil" data-edit="' + esc(t.id) +
         '" title="修改标题（留空则恢复自动标题）">✎</button>';
     }
-    h += "</span></td>";
-
-    // 操作列：图标化，省宽度
-    h += '<td class="c-acts"><span class="ico">';
-    h += '<button data-toggle="' + esc(t.id) + '" title="' +
-      (open ? "收起详情" : "展开详情") + '">' + (open ? "▲" : "▼") + "</button>";
-    if (!t.deleted) h += '<button class="dg" data-del="' + esc(t.id) + '" title="删除（进回收站）">🗑</button>';
-    else h += '<button data-restore="' + esc(t.id) + '" title="恢复">↩</button>';
     h += "</span></td></tr>";
 
     // 展开行：把原来卡片里的详情整块搬进来
@@ -1205,6 +1686,343 @@ function renderTasks() {
     h += renderTaskTable(filtered);
   }
   return h;
+}
+
+/* ================= 扩展列表 ================= */
+
+const PLUG_COLS = [
+  // key      表头        排序字段      列宽类
+  ["name",    "名称",     "pname",      "c-pname"],
+  ["kind",    "类型",     "pkind",      "c-pkind"],
+  ["source",  "来源",     "psrc",       "c-psrc"],
+  ["desc",    "说明",     "",           "c-pdesc"],
+  ["version", "版本",     "",           "c-pver"],
+  ["author",  "作者",     "",           "c-pauth"],
+  ["updated", "更新时间", "pupdated",   "c-pupd"],
+  ["status",  "状态",     "pinst",      "c-pstat"],
+];
+
+function renderPlugins() {
+  const all = DATA.plugins || [];
+  const filtered = sortPlugins(all.filter(matchPlugin));
+  if (!filtered.length) {
+    return '<div class="empty"><div class="big">🔍</div><div class="t">没有匹配的扩展</div>' +
+      "<div>试试放宽筛选条件，或清空搜索关键词</div></div>";
+  }
+  const total = all.length;
+  const nInst = all.filter(p => p.installed).length;
+
+  let h = '<div class="tools"><span>显示 ' + filtered.length + " / " + total +
+    " 个（其中已安装 " + nInst + "）</span>";
+  if (state.plugInstalled === "yes") {
+    h += '<span class="badge b-run">只看已安装</span>';
+  } else if (state.plugInstalled === "no") {
+    h += '<span class="badge b-warn">只看市场货架（未安装）</span>';
+  }
+  h += '<span style="margin-left:auto;font-size:11.5px">点行展开详情 · 拖表头右缘调列宽</span>';
+  h += "</div>";
+
+  const view = "plugins";
+  h += '<div class="lt-wrap"><table class="lt' +
+    (hasCustomCols(view) ? " fixed" : "") + '">';
+  h += colsHtml(view, PLUG_COLS);
+  h += "<thead><tr>";
+  PLUG_COLS.forEach(c => { h += thHtml(view, c); });
+  h += "</tr></thead><tbody>";
+
+  filtered.forEach(p => {
+    const open = openSet.has(p.id);
+    h += '<tr class="' + (open ? "open" : "") + (p.missing ? " is-del" : "") + '" data-id="' +
+      esc(p.id) + '" data-row="' + esc(p.id) + '" title="' +
+      (open ? "点击收起详情" : "点击展开详情") + '">';
+
+    // 名称列：主显中文展示名，副显标识 ——
+    // 明哥的反馈：「只看 slug 看不太懂是什么技能」。所以中文名放前面、
+    // 加粗；标识缩到下面一行小字（排查问题、复制命令时还要用到它）。
+    //
+    // 🔴 两行都写同一个词的情况要躲开：像官方 github 连接器，它自己
+    // plugin.json 里的 name 就是 "github"，这时 display_name 和 name 一模一样，
+    // 主显「github」、副显「github」，看起来像渲染坏了。
+    // 判据是 **display_name 和 name 不同**才显示副标题，不是「有没有 display_name」。
+    const disp = p.display_name || "";
+    const dup = !disp || disp === p.name;     // 名字和标识重合，副标题没意义
+    const primary = disp || p.name;
+    h += '<td class="c-pname"><span class="ell" title="' + esc(primary) +
+      (disp && !dup ? "（" + esc(p.name) + "）" : "") + '"><b>' + esc(primary) + "</b></span>";
+    if (!dup) {
+      h += '<span class="sub2 mono">' + esc(p.name) + "</span>";
+    } else if (p.kind_note) {
+      // 名字重合时改用类型说明（「11 个角色」这种）填那行，别留白
+      h += '<span class="sub2">' + esc(p.kind_note) + "</span>";
+    }
+    h += "</td>";
+
+    h += '<td class="c-pkind"><span class="badge ' + (KIND_BADGE[p.kind] || "b-mode") + '">' +
+      esc(KIND_LABEL[p.kind] || p.kind) + "</span></td>";
+
+    h += '<td class="c-psrc"><span class="ell" title="' + esc(p.source) + '">' +
+      esc(SRC_LABEL[plugSrcGroup(p)] || p.source) + "</span>";
+    if (p.marketplace && p.marketplace !== "local" && p.marketplace !== "mcp") {
+      h += '<span class="sub2">' + esc(p.marketplace) + "</span>";
+    }
+    h += "</td>";
+
+    h += '<td class="c-pdesc"><span class="ell" title="' + esc(p.desc || "") + '">' +
+      (p.desc ? esc(p.desc) : '<span style="color:var(--text-3)">—</span>') + "</span></td>";
+
+    h += '<td class="c-pver"><span class="ell mono" title="' + esc(p.version || "") + '">' +
+      (p.version ? esc(p.version) : '<span style="color:var(--text-3)">—</span>') + "</span></td>";
+
+    h += '<td class="c-pauth"><span class="ell" title="' + esc(p.author || "") + '">' +
+      (p.author ? esc(p.author) : '<span style="color:var(--text-3)">—</span>') + "</span></td>";
+
+    h += '<td class="c-pupd nowrap">' + (p.updated_at ? fmtTime(p.updated_at)
+      : '<span style="color:var(--text-3)">—</span>') + "</td>";
+
+    // 状态列：没装的要一眼看出来，否则「我装了 95 个」这句话会被误读
+    h += '<td class="c-pstat">' + (p.installed
+      ? '<span class="badge b-done">已安装</span>'
+      : '<span class="badge b-mode">未安装</span>') +
+      (p.enabled === false ? '<span class="badge b-err">已停用</span>' : "") + "</td></tr>";
+
+    if (open) {
+      h += '<tr class="exp-row"><td colspan="' + PLUG_COLS.length + '">' +
+        '<div class="exp-in">' + renderPluginDetail(p) + "</div></td></tr>";
+    }
+  });
+  h += "</tbody></table></div>";
+  return h;
+}
+
+function renderPluginDetail(p) {
+  let h = "";
+  h += '<div class="sect"><div class="sect-t">扩展信息</div><dl class="kv">';
+  h += "<dt>标识</dt><dd class=\"mono\">" + esc(p.id) + "</dd>";
+  if (p.display_name) h += "<dt>中文名</dt><dd><b>" + esc(p.display_name) + "</b></dd>";
+  h += "<dt>名称</dt><dd>" + esc(p.name) + "</dd>";
+  h += "<dt>类型</dt><dd>" + esc(KIND_LABEL[p.kind] || p.kind) +
+    (p.kind_note ? "（" + esc(p.kind_note) + "）" : "") + "</dd>";
+  h += "<dt>来源</dt><dd>" + esc(p.source) + "</dd>";
+  if (p.marketplace) h += "<dt>市场</dt><dd>" + esc(p.marketplace) + "</dd>";
+  if (p.version) h += "<dt>版本</dt><dd>" + esc(p.version) + "</dd>";
+  if (p.author) h += "<dt>作者</dt><dd>" + esc(p.author) + "</dd>";
+  if (p.scope) h += "<dt>作用域</dt><dd>" + esc(p.scope) + "</dd>";
+  h += "<dt>安装状态</dt><dd>" + (p.installed ? "已安装" : "未安装（在市场货架上）") + "</dd>";
+  if (p.installed_at) h += "<dt>安装时间</dt><dd>" + fmtTime(p.installed_at) + "</dd>";
+  if (p.updated_at) h += "<dt>更新时间</dt><dd>" + fmtTime(p.updated_at) + " · " +
+    relTime(p.updated_at) + "</dd>";
+  if (p.path) h += '<dt>所在目录</dt><dd class="mono" style="font-size:11.5px">' + esc(p.path) + "</dd>";
+  h += "</dl>";
+
+  if (p.desc) {
+    h += '<div class="sect"><div class="sect-t">说明</div><div style="font-size:12.5px;' +
+      'line-height:1.7;color:var(--text-2);white-space:normal">' + esc(p.desc) + "</div></div>";
+  }
+  if ((p.keywords || []).length) {
+    h += '<div class="sect"><div class="sect-t">关键词 ' + p.keywords.length + "</div><div>";
+    p.keywords.slice(0, 24).forEach(k => {
+      h += '<span class="badge b-mode" style="margin:0 4px 4px 0">' + esc(k) + "</span>";
+    });
+    h += "</div></div>";
+  }
+
+  h += '<div class="dr-acts">';
+  if (p.path && !p.missing) h += '<button class="act" data-reveal="' + esc(p.path) + '">📂 打开目录</button>';
+  h += '<button class="act" data-copy="' + esc(p.display_name || p.name) + '">复制名称</button>';
+  h += '<button class="act" data-copy="' + esc(p.id) + '">复制标识</button>';
+  if (p.path) h += '<button class="act" data-copy="' + esc(p.path) + '">复制目录</button>';
+  h += "</div></div>";
+  return h;
+}
+
+/* ================= 在线搜索（SkillHub） =================
+   //
+   // 明哥的要求：扩展页能看货架，但搜不了线上的 —— 把「搜线上 + 装」也放进来。
+   //
+   // 设计：
+   //   · 搜索**必须手动触发**（点按钮或回车），不在页面加载时自动打接口。
+   //     公网接口有超时，放加载路径上会让整页卡住。
+   //   · 结果独立成表，和本机扩展列表分开 —— 两个列表混在一起，
+   //     「哪个装了我点了才知道」这件事会变得很烦。
+   //   · 装之前要把「这是别人的代码」说清楚。不做静默安装。
+*/
+const OL = { q: "", loading: false, results: null, err: "", installed: {}, installing: "" };
+
+const ONLINE_COLS = [
+  ["name",    "名称",     "",  "c-oname"],
+  ["author",  "作者",     "",  "c-oauthor"],
+  ["desc",    "说明",     "",  "c-odesc"],
+  ["version", "版本",     "",  "c-over"],
+  ["dl",      "下载量",   "",  "c-odl"],
+  ["status",  "状态",     "",  "c-ostat"],
+];
+
+function renderOnline() {
+  let h = "";
+  h += '<div class="note info"><b>在线搜索：</b>从 SkillHub（skillhub.cn）搜公开技能。' +
+    '装下来的技能会放进你的技能目录，<b>等于把别人的代码装进本机</b> —— ' +
+    '建议先看详情再装。搜索是手动的，不会自动联网。</div>';
+
+  h += '<div class="ol-bar">';
+  h += '<div class="search"><input id="ol-q" type="text" ' +
+    'placeholder="搜技能名 / 功能关键词（如：视频、翻译、PPT）…" autocomplete="off" ' +
+    'spellcheck="false" value="' + esc(OL.q) + '"></div>';
+  h += '<button class="btn primary" id="ol-go">🔍 搜索在线技能</button>';
+  if (OL.results) h += '<button class="btn" id="ol-clear">清空结果</button>';
+  h += "</div>";
+
+  if (OL.loading) {
+    return h + '<div class="empty"><div class="big">⏳</div><div class="t">正在搜索…</div>' +
+      "<div>第一次请求可能要几秒</div></div>";
+  }
+  if (OL.err) {
+    return h + '<div class="note"><b>搜索失败：</b>' + esc(OL.err) +
+      '<br>内网环境可能访问不了公网接口。' +
+      '可以改用官方技能市场（客户端左侧「技能」），或检查网络后重试。</div>';
+  }
+  if (!OL.results) {
+    return h + '<div class="empty"><div class="big">🌐</div>' +
+      '<div class="t">输入关键词后点「搜索在线技能」</div>' +
+      "<div>只搜公开接口，不会上传你自己的任何数据</div></div>";
+  }
+  if (!OL.results.length) {
+    return h + '<div class="empty"><div class="big">🔍</div><div class="t">没有搜到「' +
+      esc(OL.q) + "」相关的技能</div><div>换个关键词试试，比如用功能词而不是技能名</div></div>";
+  }
+
+  const inst = DATA.plugins || [];
+  const localNames = new Set();
+  inst.forEach(p => {
+    localNames.add((p.name || "").toLowerCase());
+    if (p.display_name) localNames.add(p.display_name.toLowerCase());
+  });
+
+  h += '<div class="ol-res-count">搜到 <b>' + OL.results.length + "</b> 个技能（按相关度排序）</div>";
+  h += '<div class="lt-wrap"><table class="lt fixed">';
+  h += "<thead><tr>";
+  ONLINE_COLS.forEach(c => {
+    h += '<th class="' + c[3] + '">' + esc(c[1]) + "</th>";
+  });
+  h += "</tr></thead><tbody>";
+
+  OL.results.forEach(it => {
+    const key = it.slug;
+    // 「已装」有两条判据：接口回的 slug 在本机目录里，或名字对得上。
+    // 只用一条会漏 —— 有的是从市场装的，目录名和 slug 不一样。
+    const isInst = !!it.installed ||
+      localNames.has((it.display_name || "").toLowerCase()) ||
+      localNames.has((it.name || "").toLowerCase());
+    const busy = OL.installing === key;
+
+    h += "<tr>";
+    h += '<td class="c-oname"><span class="ell" title="' + esc(it.display_name) + '"><b>' +
+      esc(it.display_name) + "</b></span>" +
+      '<span class="sub2 mono">' + esc(it.slug) + "</span></td>";
+    h += '<td class="c-oauthor"><span class="ell" title="' + esc(it.author) + '">' +
+      (it.author ? esc(it.author) : '<span style="color:var(--text-3)">—</span>') + "</span>";
+    if (it.namespace) h += '<span class="sub2">@' + esc(it.namespace) + "</span>";
+    h += "</td>";
+    h += '<td class="c-odesc"><span class="ell" title="' + esc(it.desc) + '">' +
+      (it.desc ? esc(it.desc) : '<span style="color:var(--text-3)">（无说明）</span>') + "</span></td>";
+    h += '<td class="c-over"><span class="ell mono">' + (it.version ? esc(it.version)
+      : '<span style="color:var(--text-3)">—</span>') + "</span></td>";
+    h += '<td class="c-odl nowrap">' + fmtNum(it.downloads) +
+      (it.stars ? ' <span style="color:var(--text-3)">★' + it.stars + "</span>" : "") + "</td>";
+    h += '<td class="c-ostat">';
+    if (isInst) {
+      h += '<span class="badge b-done">已安装</span>';
+    } else if (busy) {
+      h += '<span class="badge b-run">安装中…</span>';
+    } else {
+      h += '<button class="act" data-oin="' + esc(key) + '" data-ons="' +
+        esc(it.namespace) + '" title="装到技能目录">⬇ 安装</button>';
+    }
+    if (it.needs_key) h += '<span class="badge b-warn" title="需要自己配 API Key">需 Key</span>';
+    h += "</td></tr>";
+  });
+  h += "</tbody></table></div>";
+
+  h += '<div class="ol-hint" style="margin-top:12px">' +
+    "· 安装前会先下载到临时目录校验，确认结构无误才落位 —— 失败不会留下半个技能。<br>" +
+    "· 装完可能需要<b>重启 WorkBuddy</b> 才会在技能列表里出现。<br>" +
+    "· 这里只做「装」，不做安全审查。第三方技能的完整审查流程见 <b>ym-skillhub</b> 技能。</div>";
+  return h;
+}
+
+/* 在线搜索：发起请求 */
+function runOnlineSearch() {
+  if (!SERVER) { showStaticHint(); return; }
+  const q = (OL.q || "").trim();
+  if (!q) { toast("先输入关键词", "err"); return; }
+  OL.loading = true; OL.err = ""; OL.results = null;
+  renderList();
+  fetch("/api/online/search?q=" + encodeURIComponent(q))
+    .then(parseJson)
+    .then(j => {
+      OL.loading = false;
+      if (j.ok) { OL.results = j.results || []; }
+      else { OL.err = j.error || "未知错误"; }
+      renderList();
+    })
+    .catch(err => {
+      OL.loading = false;
+      OL.err = String(err && err.message || err);
+      renderList();
+    });
+}
+
+/* 在线安装：默认不覆盖；已存在时弹二次确认 */
+function doOnlineInstall(slug, ns, overwrite) {
+  if (!SERVER) { showStaticHint(); return; }
+  if (!slug) return;
+
+  // 走一遍 `[data-oin]` 那一套已经算出来的「已装」判据，避免用户对着
+  // 「已安装」的徽标又点了一次（这种情况只可能出现在没有 installed 标记的回包里）。
+  if (!overwrite) {
+    const hit = (DATA.plugins || []).some(p => (p.name || "") === slug ||
+      (p.display_name || "") === slug);
+    if (hit) {
+      dialog("这个技能已经装过了", [
+        "本机技能目录里已经有一个「" + slug + "」。",
+        "继续安装会用线上版本替换掉它，并先把它备份成 <span class='mono'>.bak-&lt;时间戳&gt;</span>。",
+        "<p style='margin:8px 0 0;color:var(--text-3);font-size:12.5px'>" +
+        "如果你手工改过这个技能，改的内容会停留在备份里，不再生效。</p>"
+      ].join("\n"), [
+        { label: "取消", ghost: true },
+        { label: "覆盖安装", danger: true, fn: () => doOnlineInstall(slug, ns, true) }
+      ]);
+      return;
+    }
+  }
+
+  OL.installing = slug;
+  renderList();
+  fetch("/api/online/install", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ slug: slug, namespace: ns || "", overwrite: !!overwrite })
+  })
+    .then(parseJson)
+    .then(j => {
+      OL.installing = "";
+      if (j.ok) {
+        toast("已安装「" + (j.name || slug) + "」" + (j.backup ? "（旧的已备份）" : ""), "ok");
+        if (j.restart_hint) setTimeout(() => toast(j.restart_hint), 1200);
+        // 装完把本机扩展列表刷新一遍，不然切回「扩展」看到的还是旧的
+        refreshData();
+      } else {
+        OL.installing = "";
+        dialog("安装失败", [j.error || "未知错误"].join("\n"), [{ label: "知道了" }]);
+        renderList();
+      }
+    })
+    .catch(err => {
+      OL.installing = "";
+      dialog("安装失败", ["请求没发出去：" + String(err && err.message || err),
+        "本地服务可能已经退出了，重新运行「启动管理中心.bat」再试。"].join("\n"),
+        [{ label: "知道了" }]);
+      renderList();
+    });
 }
 
 //
@@ -1367,38 +2185,124 @@ function renderAutomations() {
 /* ================= 视图：资料库 ================= */
 function renderLibrary() {
   const roots = DATA.library_roots || [];
-  if (!roots.length) return '<div class="empty"><div class="big">🗄️</div><div class="t">没有可用的资料库目录</div></div>';
+  const groups = DATA.library_groups || [];
 
+  // ---------- 浏览中（子目录）：面包屑 + 文件表 ----------
+  if (state.libPath) return renderLibraryBrowse(roots);
+
+  // ---------- 首页：页签 + 入口卡片 ----------
+  //
+  // 为什么做页签：原来 WorkBuddy 自己的东西全埋在「WorkBuddy 数据」一张卡后面，
+  // 得点进去再一层层翻 —— 用户的反馈是「原来 workbuddy 里的资料在哪里了呢」。
+  // 现在按资料类型分组，进了资料库就能直接看到技能有多少、产物有多少。
   let h = "";
-  if (!state.libPath) {
-    h += '<div class="note info">这里是本机常用的资料目录。点进去可以浏览文件、用系统程序打开，' +
-      "也可以直接在资源管理器里定位。</div>";
+
+  if (!groups.length && !roots.length) {
+    return '<div class="empty"><div class="big">🗄️</div><div class="t">没有可用的资料库目录</div></div>';
+  }
+
+  h += '<div class="note info">这里是本机资料目录。上面几个页签是 WorkBuddy 自己的数据（' +
+    "技能、产物、方案、记忆等），下面「我配置的目录」是你自己加的常用位置。" +
+    "点任意一张卡即可浏览，也可以直接在资源管理器里打开。</div>";
+
+  if (groups.length) {
+    // 页签
+    const active = state.libTab && groups.some(g => g.id === state.libTab)
+      ? state.libTab : groups[0].id;
+    h += '<div class="tabs">';
+    groups.forEach(g => {
+      const n = (g.entries || []).reduce((a, e) => a + (e.count || 0), 0);
+      h += '<button class="tab' + (g.id === active ? " on" : "") +
+        '" data-libt="' + esc(g.id) + '">' + esc(g.name) +
+        (n ? '<span class="tabn">' + n + "</span>" : "") + "</button>";
+    });
+    h += "</div>";
+
+    const grp = groups.find(g => g.id === active) || groups[0];
+    h += '<div class="sect-t">' + esc(grp.name) + " · " + esc(grp.desc) + "</div>";
     h += '<div class="grid">';
-    roots.forEach(r => {
+    (grp.entries || []).forEach(e => {
       h += '<div class="pcard">';
-      h += '<div class="pn">🗄️ ' + esc(r.name) + "</div>";
-      h += '<div class="pp mono">' + esc(r.path) + "</div>";
+      h += '<div class="pn">' + (LIB_ICON[e.rel] || "📁") + " " + esc(e.label) + "</div>";
+      h += '<div class="pp one mono" title="' + esc(e.path) + '">…\\' + esc(e.rel) + "</div>";
       h += '<div class="pst">' +
-        (r.child_count != null ? "<span>顶层 <b>" + r.child_count + "</b> 项</span>" : "") +
-        (r.top_bytes ? "<span>直接文件 <b>" + fmtSize(r.top_bytes) + "</b></span>" : "") +
+        (e.count != null ? "<span><b>" + e.count + "</b> 项</span>" : "<span>—</span>") +
         "</div>";
-      h += '<div class="pp" style="color:var(--text-2);font-size:12.5px">' + esc(r.desc || "") + "</div>";
+      h += '<div class="pp" style="color:var(--text-2);font-size:12.5px">' + esc(e.desc || "") + "</div>";
       h += '<div class="acts">' +
-        '<button class="act pri" data-lib="' + esc(r.path) + '">浏览</button>' +
-        '<button class="act" data-reveal="' + esc(r.path) + '">在资源管理器打开</button>' +
+        '<button class="act pri" data-lib="' + esc(e.path) + '">浏览</button>' +
+        '<button class="act" data-reveal="' + esc(e.path) + '">在资源管理器打开</button>' +
         "</div></div>";
     });
     h += "</div>";
-    return h;
   }
 
-  // 浏览中：从 DATA 没有实时目录内容，需向服务端要
-  const ent = window.__LIB_CACHE__ && window.__LIB_CACHE__.path === state.libPath ? window.__LIB_CACHE__ : null;
+  // 用户自己配的目录（保持原样，只把文案改清楚）
+  if (roots.length) {
+    h += '<div class="sect-t" style="margin-top:22px">我配置的目录</div>';
+    h += '<div class="note">这些是在「设置与日志」里配的常用位置，可增删。</div>';
+    h += '<div class="grid">';
+    roots.forEach(r => {
+      h += '<div class="pcard' + (r.missing ? " miss" : "") + '">';
+      h += '<div class="pn">🗄️ ' + esc(r.name) + (r.missing ? "（目录不存在）" : "") + "</div>";
+      h += '<div class="pp mono">' + esc(r.path) + "</div>";
+      h += '<div class="pst">' +
+        (!r.missing && r.child_count != null ? "<span>顶层 <b>" + r.child_count + "</b> 项</span>" : "") +
+        (!r.missing && r.top_bytes ? "<span>直接文件 <b>" + fmtSize(r.top_bytes) + "</b></span>" : "") +
+        "</div>";
+      h += '<div class="pp" style="color:var(--text-2);font-size:12.5px">' + esc(r.desc || "") + "</div>";
+      h += '<div class="acts">' +
+        (r.missing
+          ? '<span style="color:var(--warn,var(--text-3));font-size:12.5px">这个目录已不存在，去「设置与日志」里改</span>'
+          : '<button class="act pri" data-lib="' + esc(r.path) + '">浏览</button>' +
+            '<button class="act" data-reveal="' + esc(r.path) + '">在资源管理器打开</button>') +
+        "</div></div>";
+    });
+    h += "</div>";
+  }
+  return h;
+}
+
+// 给常见目录配个图标，光看名字不够直观
+const LIB_ICON = {
+  "skills": "🧩",
+  "experts": "🎓",
+  "plugins": "🔌",
+  "connectors": "🔗",
+  "mcp-servers": "🛠️",
+  "skills-marketplace": "🛒",
+  "skill-backups": "💾",
+  "projects": "💬",
+  "artifact-index": "📦",
+  "tasks": "✅",
+  "sessions": "📋",
+  "changes-index": "🔀",
+  "changes-detail": "📝",
+  "automation-backups": "⏰",
+  "plans": "📐",
+  "memory": "🧠",
+  "inspiration": "💡",
+  "file-history": "🕘",
+  "logs": "📜",
+  "clipboard-images": "🖼️",
+  "appearance-resources": "🎨",
+  "wb-skin": "✨",
+  "storage": "🗃️",
+  "blobs": "🧱",
+};
+
+function renderLibraryBrowse(roots) {
+  const ent = window.__LIB_CACHE__ && window.__LIB_CACHE__.path === state.libPath
+    ? window.__LIB_CACHE__ : null;
+  let h = "";
+  // 面包屑：首页 → 上一级 → 当前
   h += '<div class="crumb">';
-  if (ent && ent.parent) h += '<span class="lnk" data-lib="' + esc(ent.parent) + '">↑ 上一级</span><span class="sep">/</span>';
-  h += '<b class="mono">' + esc(state.libPath) + "</b>";
-  h += '<button class="act" style="margin-left:auto" data-lib-root="1">返回资料库首页</button>';
-  h += '<button class="act" data-reveal="' + esc(state.libPath) + '">在资源管理器打开</button>';
+  h += '<span class="lnk" data-lib-root="1">🗄️ 资料库</span>';
+  if (ent && ent.parent) h += '<span class="sep">/</span><span class="lnk" data-lib="' +
+    esc(ent.parent) + '">↑ 上一级</span>';
+  h += '<span class="sep">/</span><b class="mono">' + esc(state.libPath) + "</b>";
+  h += '<button class="act" style="margin-left:auto" data-reveal="' + esc(state.libPath) +
+    '">在资源管理器打开</button>';
   h += '<button class="act" data-copy="' + esc(state.libPath) + '">复制路径</button>';
   h += "</div>";
 
@@ -1411,21 +2315,20 @@ function renderLibrary() {
   let list = ent.entries || [];
   const q = state.q.toLowerCase();
   if (q) list = list.filter(e => (e.name || "").toLowerCase().includes(q));
-  if (!list.length) return h + '<div class="empty"><div class="big">📂</div><div class="t">这个目录是空的</div></div>';
+  if (!list.length) {
+    return h + '<div class="empty"><div class="big">📂</div><div class="t">' +
+      (q ? "没有匹配「" + esc(state.q) + "」的文件" : "这个目录是空的") + "</div></div>";
+  }
 
-  h += '<table class="tbl"><thead><tr><th>名称</th><th>大小</th><th>修改时间</th><th style="text-align:right">操作</th></tr></thead><tbody>';
+  h += '<table class="tbl lt"><thead><tr><th>名称</th><th>大小</th><th>修改时间</th></tr></thead><tbody>';
   list.forEach(e => {
-    h += "<tr>";
-    h += '<td><span class="nm" style="cursor:' + (e.is_dir ? "pointer" : "pointer") + '" ' +
+    h += '<tr data-row="lib:' + esc(e.path) + '">';
+    h += '<td class="c-pname"><span class="ell nm" ' +
       (e.is_dir ? 'data-lib="' + esc(e.path) + '"' : 'data-open="' + esc(e.path) + '"') + ">" +
       (e.is_dir ? "📁 " : "📄 ") + esc(e.name) + "</span></td>";
     h += "<td>" + (e.is_dir ? "—" : fmtSize(e.size)) + "</td>";
     h += "<td>" + esc(fmtTime(e.mtime)) + "</td>";
-    h += '<td style="text-align:right;white-space:nowrap">';
-    if (!e.is_dir) h += '<button class="act" data-open="' + esc(e.path) + '">打开</button> ';
-    h += '<button class="act" data-reveal="' + esc(e.path) + '">定位</button> ';
-    h += '<button class="act" data-copy="' + esc(e.path) + '">复制路径</button>';
-    h += "</td></tr>";
+    h += "</tr>";
   });
   h += "</tbody></table>";
   if (ent.truncated) h += '<div class="note">目录内容超过上限，只显示了前 ' + list.length + " 项。</div>";
@@ -1437,11 +2340,249 @@ function renderLibrary() {
 function loadLib() {
   if (!SERVER || !state.libPath) return;
   fetch("/api/ls?path=" + encodeURIComponent(state.libPath))
-    .then(r => r.json()).then(j => {
+    .then(parseJson).then(j => {
       if (!j.ok) { toast("读取目录失败：" + (j.error || ""), "err"); return; }
       window.__LIB_CACHE__ = { path: state.libPath, parent: j.parent, entries: j.entries, truncated: j.truncated };
       render();
     }).catch(() => toast("读取目录失败", "err"));
+}
+
+/* ================= 视图：账户 =================
+   //
+   // 明哥的要求：把「点头像进去」那一套也搬进来 —— 积分余额、设置、记忆、
+   // 检查更新、领取每日积分、成长计划。
+   //
+   // 一个必须讲清楚的事实：**积分这些数据拿不到**。
+   // 它们要登录令牌，令牌在系统加密存储里 —— 一个本地小工具去解密主程序的
+   // 凭据，既不稳也不该。所以这里的分工是：
+   //   · 本地能读的（账户信息、版本、记忆文件）→ 直接显示
+   //   · 需要登录态的（积分/签到/成长计划）   → 做成入口，唤起客户端或开网页
+   // 页面上会把这两类明确区分开，不假装能看。
+*/
+const ACCT = { data: null, loading: false, err: "" };
+
+function renderAccount() {
+  if (!ACCT.data && !ACCT.loading && !ACCT.err) {
+    loadAccount();
+  }
+  if (ACCT.loading) {
+    return '<div class="empty"><div class="big">👤</div><div class="t">正在读取账户信息…</div></div>';
+  }
+  if (ACCT.err) {
+    return '<div class="note"><b>读取失败：</b>' + esc(ACCT.err) +
+      (SERVER ? "" : "<br>账户信息需要本地服务（启动管理中心.bat）。") + "</div>";
+  }
+  const d = ACCT.data || {};
+  const a = d.account || {};
+  const c = d.client || {};
+  const mem = d.memory || { groups: [], total: 0 };
+
+  let h = '<div class="acct">';
+
+  // ---------- 1) 账户 ----------
+  h += '<div class="acard">';
+  h += "<h3><span class=\"ico\">👤</span>账户</h3>";
+  if (a.nickname || a.uid) {
+    const initial = (a.nickname || "?").slice(0, 1);
+    h += '<div class="who"><div class="avatar">' + esc(initial) + "</div><div>";
+    h += '<div class="nm">' + esc(a.nickname || "（未登录）") + "</div>";
+    h += '<div class="sub">' + esc(editionLabel(a)) + "</div></div></div>";
+    h += '<dl class="kv">';
+    if (a.uid) h += '<dt>UID</dt><dd class="mono">' + esc(a.uid.slice(0, 18)) + "…</dd>";
+    if (a.type) h += "<dt>类型</dt><dd>" + esc(a.type === "personal" ? "个人版" : a.type) + "</dd>";
+    if (a.saved_at) h += "<dt>快照于</dt><dd>" + fmtTime(a.saved_at) + "</dd>";
+    h += "</dl>";
+  } else {
+    h += '<div class="ol-hint">没找到本机账户快照 —— 可能还没在这台机器上登录过 WorkBuddy。</div>';
+  }
+  h += "</div>";
+
+  // ---------- 2) 客户端 ----------
+  h += '<div class="acard">';
+  h += "<h3><span class=\"ico\">🖥️</span>客户端</h3>";
+  h += '<dl class="kv">';
+  h += "<dt>版本</dt><dd>" + (c.version ? "<b>" + esc(c.version) + "</b>" : "—") + "</dd>";
+  if (c.product) h += "<dt>产品</dt><dd>" + esc(c.product) + "</dd>";
+  if (c.endpoint) h += '<dt>服务端</dt><dd class="mono" style="font-size:11.5px">' +
+    esc(c.endpoint) + "</dd>";
+  h += '<dt>数据目录</dt><dd class="mono" style="font-size:11.5px">' + esc(c.data_dir || "") + "</dd>";
+  h += "</dl>";
+  h += '<div class="dr-acts" style="margin-top:11px">';
+  if (c.exe) h += '<button class="act" data-reveal="' + esc(c.exe) + '">📂 打开安装目录</button>';
+  h += '<button class="act" id="btn-ckupd">🔄 检查更新</button>';
+  h += "</div>";
+  h += '<div id="ckupd-box"></div>';
+  h += "</div>";
+
+  // ---------- 3) 积分与活动 ----------
+  h += '<div class="acard">';
+  h += "<h3><span class=\"ico\">🎁</span>积分与活动</h3>";
+  h += '<div class="note" style="margin:0 0 11px;font-size:12px">' +
+    "积分余额、签到、成长计划都需要<b>登录态</b>才能读 —— 本页只读本地数据，" +
+    "不碰你的登录凭据。点下面的入口去客户端里看（那里本来就登录着）。</div>";
+  (d.links || []).forEach(l => {
+    h += '<div class="lnk" data-acctlink="' + esc(l.url) + '" data-kind="' + esc(l.kind) + '">' +
+      '<span class="i">' + linkIcon(l.id) + "</span>" +
+      '<span style="min-width:0"><span class="t">' + esc(l.label) + "</span>" +
+      '<div class="h">' + esc(l.hint || "") + "</div></span>" +
+      '<span class="arrow">↗</span></div>';
+  });
+  h += "</div>";
+
+  // ---------- 4) 记忆 ----------
+  h += '<div class="acard" style="grid-column:span 2">';
+  h += "<h3><span class=\"ico\">🧠</span>记忆文件 <span style=\"font-weight:400;" +
+    "color:var(--text-3);font-size:11.5px\">共 " + (mem.total || 0) + " 个 · 只读</span></h3>";
+  if (!mem.groups || !mem.groups.length) {
+    h += '<div class="ol-hint">没有找到记忆文件。</div>';
+  } else {
+    mem.groups.forEach(g => {
+      h += '<div style="margin-bottom:13px">';
+      h += '<div style="font-size:12.5px;font-weight:650;color:var(--text);' +
+        'margin-bottom:6px">' + esc(g.label) +
+        ' <span style="font-weight:400;color:var(--text-3);font-size:11.5px">' +
+        esc(g.desc) + " · " + g.items.length + " 个</span></div>";
+      g.items.slice(0, 40).forEach(it => {
+        h += '<div class="mem-item" data-mem="' + esc(it.path) + '">' +
+          '<span class="fi">' + (it.name.endsWith(".json") ? "⚙️" : "📝") + "</span>" +
+          '<span class="mn" title="' + esc(it.path) + '">' + esc(it.title || it.name) + "</span>" +
+          '<span class="ms">' + fmtSize(it.size) + " · " + relTime(it.mtime) + "</span>" +
+          '<span class="go">查看 ›</span></div>';
+      });
+      if (g.items.length > 40) {
+        h += '<div class="ol-hint" style="margin-left:10px">（还有 ' +
+          (g.items.length - 40) + " 个未列出）</div>";
+      }
+      h += "</div>";
+    });
+  }
+  h += "</div>";
+
+  h += "</div>";
+  return h;
+}
+
+function editionLabel(a) {
+  const ed = { free: "免费版", pro: "专业版", team: "团队版", enterprise: "企业版" }[a.edition] || a.edition || "";
+  const bits = [];
+  if (a.is_pro) bits.push("Pro");
+  if (ed) bits.push(ed);
+  if (a.is_admin) bits.push("管理员");
+  return bits.join(" · ") || "—";
+}
+
+function linkIcon(id) {
+  return { credits: "💰", checkin: "📅", growth: "🌱", settings: "⚙️", home: "🏠" }[id] || "🔗";
+}
+
+function loadAccount() {
+  if (!SERVER) {
+    ACCT.err = "账户信息需要本地服务";
+    renderList();
+    return;
+  }
+  ACCT.loading = true;
+  renderList();
+  fetch("/api/account").then(parseJson).then(j => {
+    ACCT.loading = false;
+    if (j && j.ok) ACCT.data = j;
+    else ACCT.err = (j && j.error) || "未知错误";
+    renderList();
+  }).catch(e => {
+    ACCT.loading = false;
+    ACCT.err = String(e);
+    renderList();
+  });
+}
+
+/* 打开记忆文件 */
+function openMemory(path) {
+  if (!SERVER) { toast("需要本地服务才能读文件", "err"); return; }
+  fetch("/api/memory?path=" + encodeURIComponent(path))
+    .then(parseJson).then(j => {
+      if (!j.ok) { toast("读取失败：" + (j.error || ""), "err"); return; }
+      dialog("记忆文件 · " + j.path.split("\\").pop(), [
+        '<div class="ol-hint" style="margin-bottom:8px">' + esc(j.path) +
+        " · " + fmtSize(j.size) + "</div>",
+        '<div class="mem-view">' + esc(j.text) + "</div>",
+      ].join("\n"), [
+        { label: "在资源管理器中打开", fn: () => revealPath(j.path) },
+        { label: "关闭", kind: "pri" },
+      ]);
+    }).catch(() => toast("读取失败", "err"));
+}
+
+/* 检查更新 */
+function doCheckUpdate() {
+  const box = $("#ckupd-box");
+  if (!box) return;
+  if (!SERVER) { toast("需要本地服务", "err"); return; }
+  box.innerHTML = '<div class="ol-hint" style="margin-top:9px">正在检查…（会联网比对 SkillHub 上的版本）</div>';
+  fetch("/api/check-update").then(parseJson).then(j => {
+    if (!j || !j.ok) {
+      box.innerHTML = '<div class="note" style="margin:9px 0 0;font-size:12px">检查失败：' +
+        esc((j && j.error) || "未知错误") + "</div>";
+      return;
+    }
+    let h = "";
+    const n = j.outdated_count || 0;
+    const ahead = (j.skills || []).filter(s => s.ahead);
+    if (n) {
+      h += '<div class="note" style="margin:9px 0 0;font-size:12px"><b>有 ' + n +
+        " 个技能可以更新：</b>";
+      h += '<div style="margin-top:6px">';
+      (j.skills || []).filter(s => s.outdated).slice(0, 12).forEach(s => {
+        h += '<div style="margin:3px 0">· <b>' + esc(s.display_name || s.dir) + "</b> " +
+          '<span class="mono">' + esc(s.version) + " → " + esc(s.latest) + "</span></div>";
+      });
+      h += "</div>";
+      h += '<div style="margin-top:7px;color:var(--text-3)">' +
+        "本页只报告，不自动更新（能悄悄改写自己文件的技能本身就是风险面）。" +
+        '更新请用 <span class="mono">skillhub upgrade</span> 或 ym-skillhub 技能。</div>';
+    } else {
+      h += '<div class="note info" style="margin:9px 0 0;font-size:12px">' +
+        "已检查 " + (j.checked_count || 0) + " 个已上架技能，没有发现新版本。" +
+        (j.self ? ' 管理中心自身 v' + esc(j.self.version) : "") + "</div>";
+    }
+    // 本地比线上还新：不是「可以更新」，说清楚，免得用户以为该去装旧版
+    if (ahead.length) {
+      h += '<div class="ol-hint" style="margin-top:7px">本地版本比线上新的有 ' +
+        ahead.length + " 个（本地改过、或线上还没跟上）：";
+      ahead.slice(0, 8).forEach(s => {
+        h += '<span style="margin-left:6px">' + esc(s.display_name || s.dir) +
+          ' <span class="mono">' + esc(s.version) + "</span></span>";
+      });
+      h += "</div>";
+    }
+    // 🔴「没上架」和「出错」要分开说。
+    //
+    // 本机 46 个本地技能里只有 13 个发到了 SkillHub。早先一律算「错误」，
+    // 页面显示「33 个错误」——用户以为工具坏了，其实什么都没坏。
+    // 未上架是**最常见的一种正常结果**，用普通提示；errors 只留给真出问题的。
+    const npub = j.not_published || [];
+    if (npub.length) {
+      h += '<div class="ol-hint" style="margin-top:7px">另外 ' + npub.length +
+        " 个是本机自制或还没上架的技能，线上没有对应条目，不参与版本比对：" +
+        npub.slice(0, 6).map(x => esc(x.display_name || x.dir || x.slug || String(x))).join("、") +
+        (npub.length > 6 ? " 等" : "") + "</div>";
+    }
+    // 真出错的（联网失败 / 超时 / 接口报错）才用醒目样式
+    const errs = j.errors || [];
+    if (errs.length) {
+      h += '<div class="note" style="margin:9px 0 0;font-size:12px">有 ' + errs.length +
+        " 个技能这次没查成（网络或接口问题，可稍后重试）：" +
+        errs.slice(0, 6).map(x => esc(x.dir || x.slug || String(x))).join("、") +
+        (errs.length > 6 ? " 等" : "") + "</div>";
+    }
+    if (j.client && j.client.version) {
+      h += '<div class="ol-hint" style="margin-top:7px">客户端版本：' +
+        esc(j.client.version) + "（客户端本身的更新请用客户端自带入口）</div>";
+    }
+    box.innerHTML = h;
+  }).catch(e => {
+    box.innerHTML = '<div class="note" style="margin:9px 0 0;font-size:12px">检查失败：' +
+      esc(String(e)) + "</div>";
+  });
 }
 
 /* ================= 视图：设置与日志 ================= */
@@ -2011,18 +3152,94 @@ function renderList() {
   else if (state.view === "tasks" || state.view === "trash") h = renderTasks();
   else if (state.view === "projects") h = renderProjects();
   else if (state.view === "automations") h = renderAutomations();
+  else if (state.view === "plugins") h = renderPlugins();
+  else if (state.view === "online") h = renderOnline();
   else if (state.view === "library") h = renderLibrary();
+  else if (state.view === "account") h = renderAccount();
   else if (state.view === "settings") h = renderSettings();
   $("#main").innerHTML = h;
+  applyColWidths();
+  bindInMain();
+}
+
+/* #main 里那些**不进工具条**的控件（它们的生命跟着 renderList 走，
+   所以不能像工具条那样只绑一次，得每次重画后重绑）。
+   注意：绝不能在这里碰 #bar —— 那个区域里的输入框正在打字。 */
+function bindInMain() {
+  const oq = $("#ol-q");
+  if (oq) {
+    // 打字只更新状态，不重画（否则光标会丢）
+    oq.addEventListener("input", e => { OL.q = e.target.value; });
+    oq.addEventListener("keydown", e => {
+      if (e.key === "Enter") { OL.q = e.target.value; runOnlineSearch(); }
+    });
+  }
+  const og = $("#ol-go");
+  if (og) og.addEventListener("click", () => {
+    const i = $("#ol-q"); if (i) OL.q = i.value;
+    runOnlineSearch();
+  });
+  const oc = $("#ol-clear");
+  if (oc) oc.addEventListener("click", () => {
+    OL.results = null; OL.err = ""; OL.q = "";
+    const i = $("#ol-q"); if (i) i.value = "";
+    const ib = $("#ol-qbar"); if (ib) ib.value = "";
+    renderList();
+  });
 }
 
 /* ================= 事件委托 ================= */
+
+/* ---- 列宽拖拽 ----
+ *
+ * 必须挂在 click **之前**（监听顺序 = 注册顺序），因为手柄就在 th 里面，
+ * 而 th 自己带 data-sortkey 会触发排序。按下时 stopPropagation 只能挡住
+ * 冒泡，挡不住同一个元素上后注册的 click —— 所以用 mousedown 阶段抢先接管：
+ * 一旦落点在手柄上就进入拖拽态，同时给这个 th 打个「刚刚在拖拽」的标记，
+ * click 那边看到标记就直接 return，避免「拖完松手顺手把表也排了序」。
+ */
+document.addEventListener("mousedown", e => {
+  const h = e.target.closest && e.target.closest(".lt th .rsz");
+  if (!h) return;
+  const th = h.closest("th");
+  if (!th) return;
+  startColResize(e, h);
+});
+// 拖完那次 click 要吞掉（否则会顺带排序 / 展开行）
+document.addEventListener("click", e => {
+  if (SUPPRESS_CLICK) { SUPPRESS_CLICK = false; e.stopPropagation(); e.preventDefault(); }
+}, true);
+document.addEventListener("dblclick", e => {
+  const h = e.target.closest && e.target.closest(".lt th .rsz");
+  if (!h) return;                       // 双击手柄 = 恢复这一列
+  const th = h.closest("th");
+  if (!th || !th.dataset.colkey) return;
+  setColWidth(state.view, th.dataset.colkey, "");
+  applyColWidths();
+  saveColWidths();
+  toast("已恢复「" + (th.textContent || "").replace(/[⇅↑↓]/g, "").trim() + "」列宽", "ok");
+});
+// 表头右键 = 恢复本页全部列宽（放在列头上才生效，避免和普通右键冲突）
+document.addEventListener("contextmenu", e => {
+  const th = e.target.closest && e.target.closest(".lt th[data-colkey]");
+  if (!th) return;
+  e.preventDefault();
+  resetColWidths(state.view);
+});
+
 document.addEventListener("click", e => {
   // 侧栏
   const nav = e.target.closest("#nav .nav-i");
   if (nav) {
     state.view = nav.dataset.view;
     if (state.view !== "library") { state.libPath = ""; }
+    // 扩展页用的是另一套排序值（pname/pkind/…）。第一次切进来时 sort 还是
+    // blankFilter 给的默认值 "updated"，而扩展的下拉里没有这一项 ——
+    // 结果下拉框显示「名称」但内部值对不上，点表头会莫名其妙。这里对齐一下。
+    if (state.view === "plugins" &&
+        !/^p(name|kind|src|updated|inst)$/.test(state.sort || "")) {
+      state.sort = "pname";
+    }
     // 这里**不再**清 q / quick 等筛选条件。理由：筛选条件已经是按视图分开存的
     // （见 state.filters），切过去读到的是那个视图自己的那一份，
     // 天然不会带上别的页面的关键词。这里再清一遍反而会把用户
@@ -2047,7 +3264,13 @@ document.addEventListener("click", e => {
     // 点同一列 = 切换升/降；点新列 = 用它排序。
     // 这里的「切换升序」只对支持双向的列有意义，其余保持默认方向即可 ——
     // sortTasks() 内部按列名决定方向，所以这里只需要换 key。
-    if (state.sort === k) {
+    //
+    // 🔴 扩展页的列名是 pname / pkind / … 另一套，**不能套用上面那行硬编码的
+    // 任务页切换表**（会把 pname 切成 "updated"，而扩展页没有这个选项，
+    // 结果点了没反应）。扩展页就直接按列排，方向由 sortPlugins() 按列决定。
+    if (state.view === "plugins") {
+      state.sort = k;
+    } else if (state.sort === k) {
       state.sort = (k === "name" || k === "oldest") ? "updated" : (k === "created" ? "oldest" : "name");
     } else {
       state.sort = k;
@@ -2056,6 +3279,67 @@ document.addEventListener("click", e => {
     renderList();
     return;
   }
+
+  // ---- 点整行展开 / 再次点击收缩（原「操作列 → 详情」按钮的替代）----
+  //
+  // 顺序很重要：行点击是**最宽**的命中区，必须放在所有行内小按钮之后判，
+  // 否则点铅笔、点任务名、点复制图标都会被它抢走。所以这里先检测落点
+  // 有没有落在「行内控件」上，有就放行给下面原有的分派。
+  const tr = e.target.closest("tr[data-row]");
+  if (tr && !e.target.closest("button,a,.pencil,[data-reopen],[data-edit],[data-copy]," +
+      "[data-open],[data-reveal],[data-lib],[input],select,.rsz,.badge-soft")) {
+    const id = tr.dataset.row;
+    // 资料库的行是文件/目录，点行没有「展开详情」这回事 ——
+    // 而且它们的 id 带 "lib:" 前缀，塞进 openSet 只会在集合里留垃圾。
+    // 交给上面 data-lib / data-open 分支去处理（点名字才进目录 / 开文件）。
+    if (id.startsWith("lib:")) return;
+    if (openSet.has(id)) openSet.delete(id); else openSet.add(id);
+    renderList();
+    return;
+  }
+
+  // ---- 在线技能：安装 ----
+  const oin = e.target.closest("[data-oin]");
+  if (oin) {
+    e.stopPropagation();
+    doOnlineInstall(oin.dataset.oin, oin.dataset.ons || "", oin.dataset.over === "1");
+    return;
+  }
+
+  // ---- 账户页：唤起客户端 / 打开网页 ----
+  const al = e.target.closest("[data-acctlink]");
+  if (al) {
+    e.stopPropagation();
+    const url = al.dataset.acctlink;
+    const kind = al.dataset.kind || "app";
+    if (!url) return;
+    if (kind === "web") {
+      // 网页入口：开新标签，别把管理中心自己顶掉 ——
+      // 用户点「签到」是想顺手领个积分，不是想离开这个面板。
+      window.open(url, "_blank", "noopener");
+    } else {
+      // app 协议：必须走 location.href，用 window.open 或 fetch 都唤不起来。
+      // 客户端没装时浏览器不会有任何反应（不会有报错），所以这里先给个提示。
+      try {
+        toast("正在唤起客户端…");
+        location.href = url;
+      } catch (err) {
+        toast("没能唤起客户端：" + url, "err");
+      }
+    }
+    return;
+  }
+
+  // ---- 账户页：查看某个记忆文件 ----
+  const mem = e.target.closest("[data-mem]");
+  if (mem) { e.stopPropagation(); openMemory(mem.dataset.mem); return; }
+
+  // ---- 账户页：检查更新 ----
+  if (e.target.closest("#btn-ckupd")) { e.stopPropagation(); doCheckUpdate(); return; }
+
+  // ---- 资料库：切页签 ----
+  const lt = e.target.closest("[data-libt]");
+  if (lt) { e.stopPropagation(); state.libTab = lt.dataset.libt; renderList(); return; }
 
   const el = e.target.closest("[data-toggle],[data-reopen],[data-copy],[data-reveal],[data-open]," +
     "[data-edit],[data-rename],[data-del],[data-restore],[data-purge],[data-lib],[data-lib-root],[data-proj-tasks]," +
@@ -2114,7 +3398,7 @@ document.addEventListener("click", e => {
 function refreshData() {
   if (!SERVER) { showStaticHint(); return; }
   toast("正在重新采集…");
-  fetch("/api/refresh", { method: "POST" }).then(r => r.json()).then(j => {
+  fetch("/api/refresh", { method: "POST" }).then(parseJson).then(j => {
     if (j.ok && j.data) { applyData(j.data); toast("已更新", "ok"); }
     else toast("刷新失败：" + (j.error || "未知"), "err");
   }).catch(() => toast("本地服务未响应，请确认窗口还开着", "err"));
@@ -2125,6 +3409,7 @@ function applyData(d) {
   DATA.projects = d.projects;
   DATA.automations = d.automations;
   DATA.library_roots = d.library_roots;
+  DATA.library_groups = d.library_groups;
   DATA.generated_at = d.generated_at;
   if (state.libPath) { window.__LIB_CACHE__ = null; }
   // 刷新数据后走 render()：数据换了，工具条里的选项/值与结果条数都可能要跟着变。
@@ -2152,18 +3437,26 @@ $("#btn-about").addEventListener("click", () => {
     "<li><b>定时任务</b> — 周期任务，可以暂停、启用、改名、删除</li>",
     "<li><b>资料库</b> — 常用资料目录的文件浏览</li>",
     "<li><b>回收站</b> — 删掉的东西都在这儿，可以恢复</li>",
+    "<li><b>扩展</b> — 已装的技能 / 专家 / 专家团 / 连接器，显示中文名和来源</li>",
+    "<li><b>在线技能</b> — 直接搜 SkillHub 并一键装到本机</li>",
+    "<li><b>账户</b> — 客户端信息、记忆文件、技能版本检查</li>",
     "<li><b>设置与日志</b> — 备份、操作记录、数据来源</li>",
     "</ul>",
     "<p><b>常见操作：</b></p>",
     "<ul>",
     "<li>点任务名 → 唤起 WorkBuddy 打开这个任务</li>",
+    "<li>点<b>整行任意位置</b> → 展开详情，再点一次收起（不用再去找「详情」按钮了）</li>",
+    "<li>拖表头右侧的竖线 → 调整列宽；双击那根线 → 恢复本列；右键表头 → 恢复本页全部</li>",
     "<li>点「标题（手动）」那一格 → 直接就地改名，回车保存、Esc 取消</li>",
     "<li>点表头（任务名 / 创建时间 / 最近更新 / 标题）→ 按该列排序</li>",
-    "<li>点「详情」→ 展开看产物、清单、用量；再点一次收起</li>",
     "<li>想看原来的卡片样式 → 勾上工具条里的「卡片视图」</li>",
     "<li>搜索框是按菜单各记一份的：切走再切回来，你之前的搜索词还在</li>",
     "</ul>",
-    "<p style='color:var(--warn)'><b>安全：</b>所有改动前都会自动备份数据库，最多留 8 份。删除的任务进回收站，可以恢复。</p>"
+    "<p><b>关于「账户」页：</b>积分余额、签到、成长计划都需要客户端的登录态，" +
+    "本工具读不到（也不该去读）。所以那几项做成<b>入口</b>，点一下唤起客户端对应页面。</p>",
+    "<p style='color:var(--warn)'><b>安全：</b>所有改动前都会自动备份数据库，最多留 8 份。" +
+    "删除的任务进回收站，可以恢复。<b>在线安装</b>是把别人的代码装进本机，" +
+    "装前请先看详情。</p>"
   ].join("\n"), [{ label: "知道了" }]);
 });
 
