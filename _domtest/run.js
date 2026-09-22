@@ -630,6 +630,29 @@ function checkLibrary() {
 
   // 自定义目录仍要保留（别为了加页签把老功能弄丢）
   must("资料库：保留「我配置的目录」", /我配置的目录/.test(document.querySelector("#main").innerHTML));
+
+  // ---- 必须说清「本机资料库」和「客户端云端资料库」不是一回事 ----
+  //
+  // 🔴 用户真实困惑（连问两次）：「原来 workbuddy 里的资料在哪里了呢」、
+  //   「这个资料库的信息我在管理中心还是没看到」——
+  //   他看的是客户端侧边栏那个资料库（我的资料 / 团队空间），那是**云端**的。
+  //   页面不把这件事写清楚，他永远会以为是我们漏做了。
+  const main2 = document.querySelector("#main").innerHTML;
+  must("资料库：写明只覆盖本机磁盘", /本机磁盘上的资料/.test(main2));
+  must("资料库：点名客户端那个资料库（区分对象）", /客户端/.test(main2) && /资料库/.test(main2));
+  must("资料库：提到云端两块读不到", /云端/.test(main2) && /(读不到|本机没有副本)/.test(main2));
+  must("资料库：列出「我的资料库」这个云端分区名", /我的资料库/.test(main2));
+  must("资料库：给出唤起客户端资料库的按钮", /data-open-url="workbuddy:\/\/my-files"/.test(main2));
+  must("资料库：指路本地产物在哪（产物索引）", /产物索引/.test(main2));
+
+  // 点了唤起按钮应该真的跳 workbuddy://my-files（不是死按钮）
+  const ouBtn = new El("button");
+  ouBtn.dataset.openUrl = "workbuddy://my-files";
+  ouBtn.closest = sel => (sel.includes("data-open-url") ? ouBtn : null);
+  document._fire("click", ouBtn);
+  must("资料库：点唤起按钮会跳到 workbuddy://my-files",
+       location.href.indexOf("workbuddy://my-files") >= 0,
+       "location.href=" + location.href);
 }
 
 // ---- parseJson：非 JSON 响应不能变成天书报错 ----

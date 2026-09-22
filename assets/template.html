@@ -509,6 +509,13 @@ body.col-resizing *{cursor:col-resize !important}
 }
 .note b{font-weight:650}
 .note.info{background:var(--accent-soft);border-color:#cfe0ff;color:#1c4fa8}
+/* 黄色提示：用于「这件事你可能会误会」——比 info 醒目，但不至于像报错 */
+.note.warn{background:var(--warn-soft);border-color:#f5e0bb;color:var(--warn)}
+.note .act{
+  display:inline-block;margin:8px 0 0;padding:4px 11px;font-size:12px;cursor:pointer;
+  background:#fff;color:var(--warn);border:1px solid #e8cf9f;border-radius:6px;font-family:inherit;
+}
+.note .act:hover{background:#fffaf0;border-color:#d9b877}
 .toast{
   position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);
   background:#1f2329;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;
@@ -2201,9 +2208,23 @@ function renderLibrary() {
     return '<div class="empty"><div class="big">🗄️</div><div class="t">没有可用的资料库目录</div></div>';
   }
 
-  h += '<div class="note info">这里是本机资料目录。上面几个页签是 WorkBuddy 自己的数据（' +
-    "技能、产物、方案、记忆等），下面「我配置的目录」是你自己加的常用位置。" +
+  h += '<div class="note info"><b>这里是本机磁盘上的资料。</b>' +
+    "上面几个页签是 WorkBuddy 存在 <span class=\"mono\">~/.workbuddy</span> 下的数据" +
+    "（技能、产物、方案、记忆等），下面「我配置的目录」是你自己加的常用位置。" +
     "点任意一张卡即可浏览，也可以直接在资源管理器里打开。</div>";
+
+  // 🔴 客户端里也有一个「资料库」，但它和我们不是一回事 —— 用户已经问过一次了
+  // （「原来 workbuddy 里的资料在哪里了呢」）。这里必须显式说清，否则他永远找不到。
+  h += '<div class="note warn" style="border-left-color:#d9a441">' +
+    "<b>和客户端侧边栏那个「资料库」的区别：</b>" +
+    "客户端那个分「<b>本地产物</b> / <b>云端网盘</b> / <b>我的资料库</b>」三块，" +
+    "后两块是<b>云端</b>的（存在腾讯云上，要登录；本页面读不到，也不该读）。" +
+    "里面「我的资料库 / 团队空间」那些文件夹 —— 比如你截图里的「SkillPay资料」—— 是" +
+    "存在云端的，<b>本机没有副本</b>。本页面能给你的是第一块「本地产物」的完整视图：" +
+    "见「任务与产物」页签里的<b>产物索引</b>。" +
+    "想管理云端那些，请点：" +
+    '<button class="act" data-open-url="workbuddy://my-files">打开客户端的资料库</button>' +
+    "</div>";
 
   if (groups.length) {
     // 页签
@@ -3340,6 +3361,23 @@ document.addEventListener("click", e => {
   // ---- 资料库：切页签 ----
   const lt = e.target.closest("[data-libt]");
   if (lt) { e.stopPropagation(); state.libTab = lt.dataset.libt; renderList(); return; }
+
+  // ---- 唤起客户端 / 打开外部链接 ----
+  //
+  // 用途：有些东西**不在这台机器的磁盘上**，比如客户端的「资料库」里的
+  // 「云端网盘 / 我的资料库」两块 —— 它们在腾讯云上，要登录，静态页面读不到。
+  // 与其假装能展示，不如给个按钮直接把他送到那儿去。
+  //
+  // workbuddy:// 走 location.href（客户端注册了协议），http(s) 走 window.open
+  // 免得把管理中心这个页面顶掉。
+  const ou = e.target.closest("[data-open-url]");
+  if (ou) {
+    e.stopPropagation();
+    const u = ou.dataset.openUrl || "";
+    if (/^https?:\/\//i.test(u)) window.open(u, "_blank", "noopener,noreferrer");
+    else location.href = u;
+    return;
+  }
 
   const el = e.target.closest("[data-toggle],[data-reopen],[data-copy],[data-reveal],[data-open]," +
     "[data-edit],[data-rename],[data-del],[data-restore],[data-purge],[data-lib],[data-lib-root],[data-proj-tasks]," +

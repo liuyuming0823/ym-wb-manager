@@ -1499,6 +1499,20 @@ def t_template_js():
     # 卡片显示条目数，而不是只有目录名
     check("增强⑦：卡片显示条目数", "项</span>" in src or "项" in src)
 
+    # --- ⑧ 说清「本机资料库」≠「客户端云端资料库」---
+    # 用户连问两次「原来 workbuddy 里的资料在哪里了呢」——
+    # 他看的是客户端侧边栏那个资料库（我的资料 / 团队空间），那是云端的。
+    # 页面不写清这件事，他永远以为是我们漏做了。
+    check("增强⑧：写明只覆盖本机磁盘", "本机磁盘上的资料" in src)
+    check("增强⑧：点出客户端那个资料库做区分", "客户端" in src and "资料库" in src)
+    check("增强⑧：说明云端两块读不到", "云端" in src and ("读不到" in src or "本机没有副本" in src))
+    check("增强⑧：列出云端分区名「我的资料库」", "我的资料库" in src)
+    check("增强⑧：给出唤起客户端的深链", "workbuddy://my-files" in src)
+    check("增强⑧：有处理 data-open-url 的点击分支", "data-open-url" in src)
+    check("增强⑧：http(s) 用 window.open 不顶掉本页", 'window.open(u, "_blank"' in src
+          or "window.open(u," in src)
+    check("增强⑧：指路本地产物在「产物索引」", "产物索引" in src)
+
     # 使用说明要跟上新菜单（旧文案里还在教人点「详情」按钮）
     check("说明：不再教用户点「详情」按钮",
           "点「详情」→ 展开" not in src)

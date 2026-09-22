@@ -9,7 +9,7 @@ description_zh: "本地网页面板：集中查看和管理 WorkBuddy 的任务�
 description_en: "A local web dashboard to browse and manage WorkBuddy tasks, artifacts, projects, automations and installed skills/experts/connectors"
 summary: "本地网页面板：集中查看和管理 WorkBuddy 的任务、产物、项目、定时任务、资料库与已装扩展"
 category: dev-programming
-version: 1.2.1
+version: 1.2.2
 author: 刘玉明
 tags: [WorkBuddy管理中心, 任务管理, 产物管理, 定时任务, 资料库, 技能管理, 专家管理, 连接器]
 trigger:
@@ -50,7 +50,7 @@ WorkBuddy 用久了会有几百个任务散在会话记录里，想找「上周�
 | **扩展** | **已安装的技能、专家、专家团、连接器、内置功能**（带中文名） |
 | **在线技能** | **搜 SkillHub 并一键安装**（免登录公开接口；安装前需本地服务） |
 | **账户** | **积分 / 签到 / 成长计划 / 设置 / 记忆 / 检查更新** |
-| 资料库 | **按资料类型分页签**（技能/任务产物/文档方案/系统外观）+ 文件浏览 |
+| 资料库 | **按资料类型分页签**（技能/任务产物/文档方案/系统外观）+ 文件浏览；并说明与客户端**云端**资料库的区别 |
 | 回收站 | 已删除的任务与定时任务 |
 
 **交互约定（v1.2.0 起）**：
@@ -190,7 +190,7 @@ scripts/            ← 全部逻辑
   make_shortcut.py  ← 生成桌面快捷方式
   make_launchers.py ← 运行时生成 .bat / .vbs 启动器（技能包不含它们）
   online.py         ← SkillHub 公开接口（搜索 / 详情 / 安装，含路径消毒）
-  selftest.py       ← 自检 391 项
+  selftest.py       ← 自检 399 项
 assets/
   template.html     ← 单文件页面模板（数据注入 /*__DATA__*/null）
 _domtest/
@@ -312,6 +312,54 @@ GET https://api.skillhub.cn/api/v1/download?slug=<slug>   # zip 二进制，用�
 - **下拉/点击的边界**：资料库的行 `data-row="lib:<路径>"` 带 `lib:` 前缀，
   行点击展开逻辑必须 `early-return` —— 否则进 `openSet` 集合只留垃圾。
 - **「我配置的目录」区块保留在下方**，用户自己配的东西不能被页签顶掉。
+
+### 🔴 「资料库」有两个，必须说清哪个是哪个
+
+这是**用户连问两次**的同一个困惑：「原来 workbuddy 里的资料在哪里了呢」→
+「这个资料库的信息我在管理中心还是没看到」。
+
+客户端侧边栏有一个「资料库」（英文 `My Files`），里面分**三块**，
+我们只管其中一块：
+
+| 客户端分区 | i18n key | 真实位置 | 管理中心 |
+|---|---|---|---|
+| **本地产物** | `myFiles.taskArtifacts` | `~/.workbuddy/artifact-index` 等本地磁盘 | ✅ 能看，就是「任务与产物」页签的产物索引 |
+| **云端网盘** | `myFiles.cloudFiles` | 腾讯云 COS（`drive.tencent.com`） | ❌ 读不到 |
+| **我的资料库** | `myFiles.spaceFiles` | 云端知识空间 / Space，含「团队空间」 | ❌ 读不到 |
+
+用户看到的「我的资料 → SkillPay资料」属于 `spaceFiles`，**在云端，本机没有副本**。
+
+**怎么确认这件事（别猜，去看客户端源码）**：客户端的 renderer 全在
+`%LOCALAPPDATA%\Programs\WorkBuddy\resources\app.asar` 里，可以直接当二进制搜关键字：
+
+```python
+buf = open(r'...\resources\app.asar','rb').read()
+buf.count('资料库'.encode('utf-8'))          # 211 次
+# myFiles.title / myFiles.taskArtifacts / myFiles.cloudFiles / myFiles.spaceFiles
+# 「知识空间（Space）资料库入口开关（enable 语义，默认关闭）」
+# 「tencentDocs: 云端资料库 CRUD 与鉴权（需 OAuth）」
+```
+
+本地也确实**没有任何云端资料库的缓存**：`storage/` 下只有 `my-files.json`，
+内容是 `{"favoriteIds.<uid>: []}` —— 只有收藏夹指针，没有文件清单。
+真正的云端文件走 `edge-sync-mapping-v*.db` 的 `edge_sync_artifact_cache`
+（字段 `cos_uri` / `download_url` / `smh_path`，全指向线上）。
+
+**所以页面上的做法**：资料库首页挂一条黄底提示，直接写明三块的区别 + 那句
+「本机没有副本」，再给一个按钮 `data-open-url="workbuddy://my-files"`
+跳到客户端的资料库。**用真实的深链，不要编**：
+
+- `workbuddy://my-files`（已确认 6 处引用，含 `?tab=cloudFiles` 用法）
+- `workbuddy://library/open?nodeId=<id>`（跳具体节点）
+- 只有 `tab=cloudFiles` 被证实；`spaceFiles` 是内部 key，**不是**已验证的 tab 参数值，
+  所以按钮不要带 tab，让它落到资料库首页即可。
+
+> `data-open-url` 的处理：`workbuddy://` 用 `location.href`（协议已注册），
+> `http(s)://` 用 `window.open` —— 别把管理中心这一页顶掉。
+
+**教训**：本地工具永远只能看到本地的东西。当用户说「我的文件在这里找不到」时，
+先把「它到底在不在本机」查清楚，再决定是**修 bug**还是**写清边界**。
+这次是后者：数据一直在云上，我们没有漏做，但**没告诉用户边界在哪**，等于让他白找两轮。
 
 ### 接口返回非 JSON 时，别把 JS 黑话甩给用户
 
@@ -566,7 +614,7 @@ GET https://api.skillhub.cn/api/v1/download?slug=<slug>   # zip 二进制，用�
 ## 自检
 
 ```bash
-python scripts/selftest.py            # 全部 391 项
+python scripts/selftest.py            # 全部 399 项
 python scripts/selftest.py --quick    # 跳过要起服务的部分
 ```
 
