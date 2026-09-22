@@ -251,7 +251,7 @@ GET https://api.skillhub.cn/api/v1/search?q=<关键词>     # 参数名必须是
 GET https://api.skillhub.cn/api/v1/download?slug=<slug>   # zip 二进制，用于安装
 ```
 
-- `tools/online.py` 封装 `search()` / `detail()` / `install()`。
+- `scripts/online.py` 封装 `search()` / `detail()` / `install()`。
 - **安装必须走本地服务**（静态快照页只能看）：`online.py` 落盘前用 `_safe_name()` /
   `_safe_join()` 双重校验，`../evil`、`..\evil`、`a/../../evil` 全部拒绝。
 - 覆盖安装要二次确认；装完返回 `restart_hint`（技能要重启客户端才加载）。

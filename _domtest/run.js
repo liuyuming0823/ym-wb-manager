@@ -13,7 +13,10 @@
 const fs = require("fs");
 const path = require("path");
 
-const ROOT = "D:/workbuddy/wb-task-manager";
+// 🔴 不要写死盘符 —— 这个文件在技能包里位于 <技能目录>/_domtest/run.js，
+//    它读的是**同一棵树里的** index.html。所以从 __dirname 往上退一级就是根目录，
+//    换台电脑、换个安装路径都成立；写死本机盘符路径在别人机器上必炸。
+const ROOT = path.resolve(__dirname, "..");
 const html = fs.readFileSync(path.join(ROOT, "index.html"), "utf8");
 
 // ---- 取出内嵌数据 + 内联脚本 ----
@@ -204,13 +207,18 @@ ctx.__SERVER__ = true;
  * `!ACCT.data && !ACCT.loading && !ACCT.err` —— 一旦第一轮用真 fetch（沙箱里必然
  * 失败）把 ACCT.err 写上了，后面再换 fetch 也没用：错误态会把重试锁住。
  * 早前就是先渲染后装桩，结果永远停在 loading/err，白查了半天。 */
+
+// 桩里的路径一律用这个假目录拼出来（`x` 是占位用户名，不是真机器路径）。
+// 这样只有一处出现盘符字面量，审计器不用满文件找。
+const FAKE_HOME = "C:/Users/x/.workbuddy";  // skill-audit: ignore
+
 const FAKE_ACCOUNT = {
   ok: true,
   account: { nickname: "刘玉明", uid: "0123456789abcdef", type: "personal",
              edition: "pro", is_pro: true, is_admin: false, saved_at: null },
-  wb_dir: "C:/Users/x/.workbuddy",
+  wb_dir: FAKE_HOME,
   client: { version: "37.10.3-24", product: "WorkBuddy", endpoint: "https://x",
-            data_dir: "C:/Users/x/.workbuddy" },
+            data_dir: FAKE_HOME },
   credits: { available: false, reason: "积分需要登录态，本页只读本地数据" },
   links: [
     { id: "credits", label: "积分余额", kind: "app", url: "workbuddy://settings/account", hint: "在客户端里查看" },
@@ -222,7 +230,7 @@ const FAKE_ACCOUNT = {
   memory: {
     groups: [{
       scope: "user", label: "用户级记忆", desc: "跨项目", items: [
-        { path: "C:/Users/x/.workbuddy/MEMORY.md", name: "MEMORY.md",
+        { path: FAKE_HOME + "/MEMORY.md", name: "MEMORY.md",
           title: "MEMORY.md", size: 1234, mtime: new Date().toISOString() },
       ],
     }],
@@ -274,7 +282,7 @@ ctx.fetch = (url, opt) => {
       self: { slug: "ym-wb-manager", version: "1.2.0" } });
   }
   if (u.indexOf("/api/memory") >= 0) {
-    return ok({ ok: true, path: "C:/Users/x/.workbuddy/MEMORY.md",
+    return ok({ ok: true, path: FAKE_HOME + "/MEMORY.md",
                 size: 20, text: "# 记忆\n内容" });
   }
   if (u.indexOf("/api/data") >= 0) return ok({ ok: true, data: null });
@@ -575,7 +583,7 @@ try {
 
 try {
   const m = new El("div");
-  m.dataset.mem = "C:/x/y.md";
+  m.dataset.mem = "C:/x/y.md";  // skill-audit: ignore（假路径，只挂 dataset 不走文件系统）
   m.closest = sel => (sel.includes("data-mem") ? m : null);
   document._fire("click", m);
   console.log("  [OK] data-mem 未抛错");
