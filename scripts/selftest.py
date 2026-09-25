@@ -504,6 +504,29 @@ def t_data():
               any(l.get("id") == want for l in links),
               [l.get("id") for l in links])
 
+    # 🔴 签到入口必须指向**真能签到的地方**（v1.2.3 修）
+    #
+    # 曾经 checkin / growth 两个入口都指向 https://www.workbuddy.cn/ —— 官网首页，
+    # 那里根本没有签到入口。用户点了找不到东西，只会更迷糊（这正是「找不到签到入口」
+    # 的直接原因之一）。扒客户端 app.asar 才搞清楚：
+    #   · 签到 = 「Buddy加油站」（account.menu.fuelStation），藏在**左下角头像**
+    #     点开的账号菜单里，由 AvatarTopSlot 渲染成气泡 .daily-checkin--bubble；
+    #   · 气泡显示条件 `!checkinBubbleDismissed` 是 React 内存态 —— 关掉后本次运行
+    #     不再弹，重启才恢复（用户「非要重启才能领」的来源）；
+    #   · 重开气泡的 reopenBubble 只在客户端内部，DEEP_LINK_ROUTE_MAP 里没有
+    #     account / checkin / credits → **不存在**直达签到的深链；
+    #   · 接口 /v2/billing/meter/daily-checkin 还要登录 Bearer 令牌 +
+    #     X-Device-Token（腾讯图灵盾设备指纹，只有客户端能生成）。
+    # 所以只能给「唤起客户端」的入口 + 把路径写清楚，绝不能假装能代签。
+    ck = next((l for l in links if l.get("id") == "checkin"), {})
+    check("账户：签到入口是「唤起客户端」而不是打开官网（官网没签到）",
+          (ck.get("url") or "").startswith("workbuddy://"), ck.get("url"))
+    check("账户：签到入口把操作路径写进 hint（点名 Buddy加油站）",
+          "Buddy加油站" in (ck.get("hint") or ""), ck.get("hint"))
+    check("账户：没有链接拿官网首页冒充签到 / 成长计划",
+          not any("workbuddy.cn" in (l.get("url") or "") for l in links),
+          [l.get("url") for l in links if "workbuddy.cn" in (l.get("url") or "")])
+
     # ---------------- 记忆文件 ----------------
     #
     # 只读浏览，但要确认：分组结构稳定、路径都是绝对路径（前端拿去点开）。
@@ -1512,6 +1535,25 @@ def t_template_js():
     check("增强⑧：http(s) 用 window.open 不顶掉本页", 'window.open(u, "_blank"' in src
           or "window.open(u," in src)
     check("增强⑧：指路本地产物在「产物索引」", "产物索引" in src)
+
+    # --- ⑨ 首页要有「每日签到」入口，且说清它在客户端哪 / 为什么不自动弹 ---
+    #
+    # 明哥的实测诉求：「签到领积分的入口……如果我一直不退出，都不弹出来领积分，
+    # 每次都需要我重启之后才能领」。
+    # 签到在客户端里（左下角头像 → Buddy加油站），管理中心只能把入口给对 +
+    # 把路径和原因写清楚。事实依据见 data.py 的 account_info() 注释。
+    check("增强⑨：签到卡片有独立样式", ".checkin{" in src)
+    check("增强⑨：首页渲染出签到卡片", 'class="checkin"' in src)
+    check("增强⑨：点名「Buddy加油站」（客户端的真实入口名）", "Buddy加油站" in src)
+    check("增强⑨：写出「点左下角头像」这一步", "左下角头像" in src)
+    check("增强⑨：给出唤起客户端的深链", "workbuddy://home" in src)
+    check("增强⑨：同时给出看积分余额的入口", "workbuddy://settings/account" in src)
+    check("增强⑨：解释气泡为什么不会自动弹（启动时才弹一次）",
+          "启动时" in src and ("关掉" in src or "不再弹" in src))
+    check("增强⑨：解释为什么本工具不能代签（设备指纹 + 令牌）",
+          "设备指纹" in src and "令牌" in src)
+    check("增强⑨：模板里不拿官网首页冒充签到入口", "workbuddy.cn" not in src)
+    check("增强⑨：账户页也写明签到具体路径", "签到具体在哪" in src)
 
     # 使用说明要跟上新菜单（旧文案里还在教人点「详情」按钮）
     check("说明：不再教用户点「详情」按钮",

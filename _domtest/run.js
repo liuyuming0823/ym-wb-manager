@@ -655,6 +655,63 @@ function checkLibrary() {
        "location.href=" + location.href);
 }
 
+// ---- 每日签到：入口得真能用，而且不能指向一个根本没有签到的页面 ----
+//
+// 🔴 来自明哥的实测诉求：「每天签到领积分的入口……如果我一直不退出，
+//   都不弹出来领积分，每次都需要我重启之后才能领」。
+//
+// 扒客户端 app.asar 得到的真相（都是可验证的字符串）：
+//   · 签到 = 客户端里的「Buddy 加油站」（account.menu.fuelStation），
+//     藏在**左下角头像**点开的账号菜单里，由 AvatarTopSlot 渲染成气泡
+//     .daily-checkin--bubble；
+//   · 气泡的显示条件是 `!checkinBubbleDismissed` —— React 内存态，
+//     关掉后本次运行不再弹，重启才恢复。这就是「非要重启才能领」的来源；
+//   · 重新唤出气泡的动作（reopenBubble）只在客户端内部，
+//     DEEP_LINK_ROUTE_MAP 里**没有** account / checkin / credits，
+//     所以不存在能直达签到的深链；
+//   · 也**不能代签**：接口 /v2/billing/meter/daily-checkin 要登录 Bearer
+//     令牌 + X-Device-Token（腾讯图灵盾设备指纹，只有客户端能生成）。
+//
+// 所以页面能做的只有两件事：把入口给对、把话说清楚。
+// 这条断言同时守着一次真实回归：link 曾经指向 https://www.workbuddy.cn/
+// （官网首页，根本没有签到入口）—— 用户点了更迷糊。
+function checkCheckin() {
+  console.log("=== 每日签到入口");
+  document._fire("click", fakeNav("overview"));
+  const m = document.querySelector("#main").innerHTML;
+
+  // 只取签到卡片那段（它在统计卡片 .cards 之前），避免误伤页面别处的链接
+  const a = m.indexOf('class="checkin"');
+  const b = m.indexOf('class="cards"', a);
+  const ck = (a >= 0 && b > a) ? m.slice(a, b) : "";
+  must("签到：首页渲染出签到卡片", ck.length > 0, "卡片长度 " + ck.length);
+  if (!ck) return;
+
+  must("签到：点出入口名「Buddy加油站」", /Buddy加油站/.test(ck));
+  must("签到：给出「先点左下角头像」这一步", /左下角头像/.test(ck));
+  must("签到：说明入口在客户端、本页读不到", /不在本页面|本页读不到/.test(ck));
+  // 关键回归：这条曾经指向官网首页
+  must("签到：不再指向官网首页（那是空入口）",
+       !/workbuddy\.cn/.test(ck),
+       (ck.match(/https?:\/\/[^\s"'<>]+/g) || []).join(" ") || "（无外链）");
+  must("签到：解释为什么不自动弹（提到启动 / 关掉）",
+       /启动时/.test(ck) && /(关掉|不再弹)/.test(ck));
+  must("签到：解释为什么不能代签（设备指纹 + 令牌）",
+       /设备指纹/.test(ck) && /令牌/.test(ck));
+  must("签到：明说不伪造积分数字", /伪造|盗用/.test(ck));
+  must("签到：同时给出看积分余额的入口",
+       /workbuddy:\/\/settings\/account/.test(ck));
+
+  // 真点按钮：必须跳 workbuddy://home（把已开着的客户端唤到前台）
+  location.href = "http://127.0.0.1:8800/";
+  const ckBtn = new El("button");
+  ckBtn.dataset.openUrl = "workbuddy://home";
+  ckBtn.closest = sel => (sel.includes("data-open-url") ? ckBtn : null);
+  document._fire("click", ckBtn);
+  must("签到：点「打开客户端去签到」会唤起 workbuddy://home",
+       location.href === "workbuddy://home", "location.href=" + location.href);
+}
+
 // ---- parseJson：非 JSON 响应不能变成天书报错 ----
 //
 // 🔴 这条来自明哥的实测截图：页面显示
@@ -700,6 +757,7 @@ function checkParseJson() {
 console.log("=== 汇总");
 (async () => {
   checkLibrary();
+  checkCheckin();
   await checkParseJson();
   await checkAccount();
   checkColWidths();

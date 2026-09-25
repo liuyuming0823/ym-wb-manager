@@ -9,7 +9,7 @@ description_zh: "本地网页面板：集中查看和管理 WorkBuddy 的任务�
 description_en: "A local web dashboard to browse and manage WorkBuddy tasks, artifacts, projects, automations and installed skills/experts/connectors"
 summary: "本地网页面板：集中查看和管理 WorkBuddy 的任务、产物、项目、定时任务、资料库与已装扩展"
 category: dev-programming
-version: 1.2.2
+version: 1.2.3
 author: 刘玉明
 tags: [WorkBuddy管理中心, 任务管理, 产物管理, 定时任务, 资料库, 技能管理, 专家管理, 连接器]
 trigger:
@@ -190,7 +190,7 @@ scripts/            ← 全部逻辑
   make_shortcut.py  ← 生成桌面快捷方式
   make_launchers.py ← 运行时生成 .bat / .vbs 启动器（技能包不含它们）
   online.py         ← SkillHub 公开接口（搜索 / 详情 / 安装，含路径消毒）
-  selftest.py       ← 自检 399 项
+  selftest.py       ← 自检 412 项
 assets/
   template.html     ← 单文件页面模板（数据注入 /*__DATA__*/null）
 _domtest/
@@ -444,6 +444,71 @@ buf.count('资料库'.encode('utf-8'))          # 211 次
 在线技能与检查更新走免登录公开接口，同样不需要 token 或密钥。
 
 
+## 🔴 签到（Buddy加油站）为什么只能做入口，不能代签
+
+明哥问过：「每天签到领积分的入口，如果我一直不退出，都不弹出来领积分，
+每次都需要我重启之后才能领。」下面这些是从客户端 `app.asar` 里挖出来的事实，
+改这块之前先看。
+
+### 入口在哪
+
+签到 = 客户端里的「**Buddy加油站**」（i18n key `account.menu.fuelStation`），
+藏在**左下角头像**点开的账号菜单里，由 `AvatarTopSlot` 渲染成一个气泡
+（CSS 类 `.daily-checkin--bubble`）。
+
+**没有深链能直达签到**：`DEEP_LINK_ROUTE_MAP` 只有
+`home / chat / projects / experts / skills / connectors / automation / colleagues /
+claw / discover / tencent-docs / my-files / ima / lexiang / agent-mail / genie /
+assistant / templates / project / expert / connector` ——
+**没有 account / checkin / credits**。
+（`settings` 走单独的 `parseSettingsDeepLink`，支持 `workbuddy://settings/<tab>`；
+菜单里的「账户管理」调的是 `openSettings("account")`，所以 `workbuddy://settings/account` 有效。）
+
+### 为什么「非要重启才能领」
+
+气泡的显示条件是：
+
+    !checkinBubbleDismissed && checkin.uiState !== "loading"
+
+`checkinBubbleDismissed` 是 **React 内存态** —— 用户把气泡关掉后，**本次运行**就不
+再弹了，只有重启才恢复。这就是那个体感的来源。它不是 bug，是客户端的交互设计。
+
+重新唤出气泡的动作叫 `reopenBubble`，只在客户端内部（账号菜单里点运营位，
+或 slot 的 `reopen_bubble` bridge 事件），**外部无法触发**。
+
+### 为什么不能代签
+
+接口是 `POST /v2/billing/meter/checkin-activity-status`（查状态）与
+`POST /v2/billing/meter/daily-checkin`（领取），要两样本工具拿不到的东西：
+
+1. **登录 Bearer 令牌** —— 在系统加密存储里（`credential-protection`）；
+2. **`X-Device-Token`** —— 腾讯图灵盾**设备指纹**，客户端运行时生成、不可缓存复刻：
+
+       async getCheckinRequestHeaders() {
+         const result = await this.providers.getTuringDeviceTokenResult?.();
+         if (result?.token) return { "X-Device-Token": result.token };
+       }
+
+另外代码注释明说「**线上 15s 超时是常态**」，签到状态在本机也**没有任何缓存**
+（`~/.workbuddy` 下搜不到 checkin / credit 相关文件）。
+
+→ 硬去拿令牌或伪造设备指纹 = 盗用用户凭据。**不做**，也绝不伪造任何积分数字。
+
+### 那这个技能做什么
+
+只做两件事，都已落地：
+
+1. **把入口给对**：首页第一屏一张「每日签到」卡片，写明三步路径
+   （点左下角头像 → Buddy加油站 → 签到领积分），并给「打开客户端去签到」
+   （`workbuddy://home`）与「看积分余额」（`workbuddy://settings/account`）两个按钮。
+2. **把话说清楚**：卡片里直接回答「为什么不自动弹」「为什么本页不能代签」。
+
+⚠️ **曾经踩的坑**：`account_info()` 的 `checkin` / `growth` 两个入口一度都指向
+`https://www.workbuddy.cn/` —— **官网首页，那里根本没有签到入口**。
+用户点了找不到东西只会更迷糊。selftest 现有断言守着这条
+（`账户：没有链接拿官网首页冒充签到 / 成长计划`），别再改回去。
+
+
 ## 常见坑
 
 这些都是实际踩出来的，改之前先看：
@@ -614,7 +679,7 @@ buf.count('资料库'.encode('utf-8'))          # 211 次
 ## 自检
 
 ```bash
-python scripts/selftest.py            # 全部 399 项
+python scripts/selftest.py            # 全部 412 项
 python scripts/selftest.py --quick    # 跳过要起服务的部分
 ```
 

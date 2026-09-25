@@ -516,6 +516,40 @@ body.col-resizing *{cursor:col-resize !important}
   background:#fff;color:var(--warn);border:1px solid #e8cf9f;border-radius:6px;font-family:inherit;
 }
 .note .act:hover{background:#fffaf0;border-color:#d9b877}
+
+/* 每日签到卡片 —— 放首页最显眼处。只做「入口 + 把话说清楚」，不代签（原因见 data.py 注释） */
+.checkin{
+  background:linear-gradient(135deg,var(--warn-soft) 0%,#fffaf1 100%);
+  border:1px solid #eddcbe;border-radius:var(--radius);padding:14px 16px;margin-bottom:15px;
+}
+.checkin .ck-h{display:flex;align-items:flex-start;gap:11px;flex-wrap:wrap}
+.checkin .ck-ico{font-size:24px;line-height:1.1}
+.checkin .ck-t{font-size:14.5px;font-weight:700;color:var(--warn)}
+.checkin .ck-s{font-size:12px;color:#8a7047;margin-top:2px}
+.checkin .ck-btn{
+  margin-left:auto;padding:7px 15px;font-size:12.5px;font-weight:600;font-family:inherit;
+  cursor:pointer;background:#c8821a;color:#fff;border:1px solid #b5720f;border-radius:7px;
+  white-space:nowrap;
+}
+.checkin .ck-btn:hover{background:#b5720f}
+.checkin .ck-btn.sm{background:#fff;color:var(--warn);border-color:#e0c79a;font-weight:500}
+.checkin .ck-btn.sm:hover{background:#fffaf0}
+.checkin .ck-steps{margin:12px 0 0;padding:0;list-style:none;display:flex;gap:8px;flex-wrap:wrap}
+.checkin .ck-steps li{
+  flex:1 1 190px;background:#fff;border:1px solid #f0e2cb;border-radius:7px;
+  padding:8px 11px;font-size:12px;color:var(--text-2);line-height:1.55;
+}
+.checkin .ck-steps li b{color:var(--warn)}
+.checkin .ck-steps li .num{
+  display:inline-block;width:16px;height:16px;line-height:16px;text-align:center;
+  background:var(--warn-soft);color:var(--warn);border-radius:50%;
+  font-size:10.5px;font-weight:700;margin-right:5px;
+}
+.checkin .ck-n{
+  margin-top:9px;padding:9px 11px;background:rgba(0,0,0,.025);border-radius:7px;
+  font-size:11.5px;color:var(--text-3);line-height:1.65;
+}
+.checkin .ck-n b{color:var(--text-2)}
 .toast{
   position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);
   background:#1f2329;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;
@@ -1266,6 +1300,33 @@ function card(label, value, desc, opts) {
 function renderOverview() {
   const s = DATA.stats;
   let h = "";
+
+  // ---- 每日签到：每天都要做一次的动作，放最前面 ----
+  // 为什么要写这么细：签到入口藏在客户端「左下角头像 → Buddy加油站」里，
+  // 用户找不到会以为工具漏做了。小程序式「一键代签」不做，原因见 data.py account_info()。
+  h += '<div class="checkin">';
+  h += '<div class="ck-h">';
+  h += '<span class="ck-ico">📅</span>';
+  h += '<div><div class="ck-t">每日签到 · 领积分</div>' +
+    '<div class="ck-s">入口在客户端左下角头像里，不在本页面 —— 本页读不到登录态</div></div>';
+  h += '<button class="ck-btn" data-open-url="workbuddy://home">打开客户端去签到</button>';
+  h += '<button class="ck-btn sm" data-open-url="workbuddy://settings/account">看积分余额</button>';
+  h += "</div>";
+  h += '<ol class="ck-steps">';
+  h += '<li><span class="num">1</span>点客户端<b>左下角头像</b></li>';
+  h += '<li><span class="num">2</span>菜单里点「<b>Buddy加油站</b>」</li>';
+  h += '<li><span class="num">3</span>点「<b>签到领积分</b>」即可</li>';
+  h += "</ol>";
+  h += '<div class="ck-n">' +
+    "<b>为什么它不会自己弹出来？</b>签到气泡只在客户端<b>启动时</b>自动出现一次；" +
+    "你把它关掉后，本次运行就不会再弹了 —— 这是客户端的设计，不是坏了。" +
+    "重启客户端能让它重新出现，但按上面三步也能随时把它叫回来，不用重启。" +
+    "<br><b>为什么这个页面不能直接帮你签？</b>签到接口要两样本页拿不到的东西：" +
+    "登录令牌（在系统加密存储里）和<b>设备指纹</b>（只有客户端能生成）。" +
+    "硬去拿等于盗用你的凭据，所以这里只做入口，也绝不伪造积分数字。" +
+    "</div>";
+  h += "</div>";
+
   h += '<div class="cards">';
   h += card("任务总数", s.total, "有效 " + s.live + " · 已删 " + s.deleted,
     { tip: "点卡片查看全部任务", quick: "" });
@@ -2440,7 +2501,10 @@ function renderAccount() {
   h += "<h3><span class=\"ico\">🎁</span>积分与活动</h3>";
   h += '<div class="note" style="margin:0 0 11px;font-size:12px">' +
     "积分余额、签到、成长计划都需要<b>登录态</b>才能读 —— 本页只读本地数据，" +
-    "不碰你的登录凭据。点下面的入口去客户端里看（那里本来就登录着）。</div>";
+    "不碰你的登录凭据。点下面的入口去客户端里看（那里本来就登录着）。" +
+    "<br><b>签到具体在哪：</b>客户端<b>左下角头像</b> → 「<b>Buddy加油站</b>」 → 「签到领积分」。" +
+    "签到气泡只在客户端<b>启动时</b>自动弹一次，关掉后本次运行不再弹（它的设计如此）；" +
+    "按这条路径能随时把气泡叫回来，不必重启。</div>";
   (d.links || []).forEach(l => {
     h += '<div class="lnk" data-acctlink="' + esc(l.url) + '" data-kind="' + esc(l.kind) + '">' +
       '<span class="i">' + linkIcon(l.id) + "</span>" +

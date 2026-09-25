@@ -1430,13 +1430,36 @@ def account_info():
     # 积分余额、成长计划、签到这些接口都要登录令牌，令牌在系统加密存储里。
     # 一个本地小工具去解密主程序的凭据，本身就不该做（也不稳）。
     # 正确做法是把用户送到**已经登录好的客户端/网页**里去，那里数据本来就在。
+    # v1.2.3 修正：签到 / 成长计划**过去指向官网首页**（https://www.workbuddy.cn/），
+    # 那里根本没有签到入口，点了只会让人更迷糊 —— 这就是「找不到签到入口」的直接原因。
+    #
+    # 真相（扒 app.asar 得到）：
+    #   签到 = 客户端里的「Buddy 加油站」，藏在**左下角头像点开的账号菜单**里，
+    #   由 AvatarTopSlot 渲染成一个气泡（.daily-checkin--bubble）。
+    #   气泡的显示条件是 `!checkinBubbleDismissed`，是**内存态** ——
+    #   关掉之后本次运行不再弹，只有重启才恢复 → 用户「非要重启才能领」的感受来源。
+    #
+    # 而重新唤出气泡的动作（reopenBubble）只在客户端内部，**没有外部深链**：
+    #   DEEP_LINK_ROUTE_MAP = home/chat/projects/experts/skills/connectors/automation/
+    #                         colleagues/claw/discover/tencent-docs/my-files/ima/lexiang/
+    #                         agent-mail/genie/assistant/templates/project/expert/connector
+    #   —— 没有 account / checkin / credits。
+    #   （settings 走单独的 parseSettingsDeepLink，支持 workbuddy://settings/<tab>）
+    #
+    # 也**不能代签**：接口 /v2/billing/meter/daily-checkin 要两样本页拿不到的东西 ——
+    #   ① 登录 Bearer 令牌（在系统加密存储里）
+    #   ② X-Device-Token —— 腾讯图灵盾设备指纹，只有客户端能生成（非缓存、不可复刻）
+    # 硬拿等于盗用用户凭据，所以这里只做入口，不碰凭据、不伪造任何数字。
     out["links"] = [
+        {"id": "checkin", "label": "每日签到 / 领积分", "kind": "app",
+         "url": "workbuddy://home",
+         "hint": "签到在客户端左下角头像里：点头像 →「Buddy加油站」→「签到领积分」"},
         {"id": "credits", "label": "积分余额", "kind": "app",
-         "url": "workbuddy://settings/account", "hint": "在客户端里查看（本页读不到登录态）"},
-        {"id": "checkin", "label": "每日签到 / 领积分", "kind": "web",
-         "url": "https://www.workbuddy.cn/", "hint": "官方活动页，登录后可签到"},
-        {"id": "growth", "label": "成长计划", "kind": "web",
-         "url": "https://www.workbuddy.cn/", "hint": "连续登录抽 Buddy 周边"},
+         "url": "workbuddy://settings/account",
+         "hint": "打开客户端账户页（本页读不到登录态）"},
+        {"id": "growth", "label": "成长计划", "kind": "app",
+         "url": "workbuddy://home",
+         "hint": "也在账号菜单里：点头像 →「成长计划」"},
         {"id": "settings", "label": "客户端设置", "kind": "app",
          "url": "workbuddy://settings/appearance", "hint": "唤起本机客户端"},
         {"id": "home", "label": "打开 WorkBuddy 首页", "kind": "app",
